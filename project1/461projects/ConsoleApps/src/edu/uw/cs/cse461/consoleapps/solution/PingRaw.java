@@ -1,6 +1,8 @@
 package edu.uw.cs.cse461.consoleapps.solution;
 
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -8,6 +10,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 import edu.uw.cs.cse461.consoleapps.PingInterface.PingRawInterface;
 import edu.uw.cs.cse461.net.base.NetBase;
@@ -103,18 +107,91 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 	/**
 	 * Pings the host/port named by the arguments the number of times named by the arguments.
 	 * Returns the mean ping time of the trials.
+	 * @throws SocketException 
 	 */
 	@Override
-	public ElapsedTimeInterval udpPing(byte[] header, String hostIP, int udpPort, int socketTimeout, int nTrials) {
-		ElapsedTime.start("PingRaw_UDPTotalDelay");
-		ElapsedTime.stop("PingRaw_UDPTotalDelay");
+	public ElapsedTimeInterval udpPing(byte[] header, String hostIP, int udpPort, int socketTimeout, int nTrials){
+		DatagramSocket socket = null;
+		DatagramPacket packet = null;
+		for (int i = 0; i < nTrials; i++) {
+			ElapsedTime.start("PingRaw_UDPTotalDelay");
+			try {
+				socket = new DatagramSocket();
+
+				InetSocketAddress address = new InetSocketAddress(hostIP, udpPort);
+				packet = new DatagramPacket(header, header.length, address.getAddress(), udpPort);
+				socket.send(packet);
+				
+	            	// get response
+				byte[] buf = new byte[4];
+				packet = new DatagramPacket(buf, buf.length);
+				socket.setSoTimeout(socketTimeout);
+				socket.receive(packet);
+			} catch (SocketTimeoutException e) {
+				ElapsedTime.abort("PingRaw_UDPTotalDelay");
+				packet = null;
+			} catch (SocketException e) {
+				socket = null;
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			if(packet != null) {
+				ElapsedTime.stop("PingRaw_UDPTotalDelay");
+			}
+			if (socket != null){
+				socket.close();
+			}
+		} 
 		return ElapsedTime.get("PingRaw_UDPTotalDelay");
 	}
 	
 	@Override
 	public ElapsedTimeInterval tcpPing(byte[] header, String hostIP, int tcpPort, int socketTimeout, int nTrials) {
-		ElapsedTime.start("PingRaw_TCPTotal");
-		ElapsedTime.stop("PingRaw_TCPTotal");
-		return ElapsedTime.get("PingRaw_TCPTotal");
+		Socket socket = null;
+		boolean timeout = false;
+		String response = null;
+		for (int i = 0; i < nTrials; i++) {
+			ElapsedTime.start("PingRaw_UDPTotalDelay");
+			try {
+				socket = new Socket(hostIP, tcpPort);
+				
+	            	// get response
+				BufferedReader in = new BufferedReader(new
+			            InputStreamReader(socket.getInputStream()));
+				OutputStream out = new DataOutputStream(socket.getOutputStream());
+				socket.setSoTimeout(socketTimeout);
+				
+				out.write(header);
+				response = in.readLine();
+			} catch (SocketTimeoutException e) {
+				ElapsedTime.abort("PingRaw_UDPTotalDelay");
+				timeout = true;
+			} catch (SocketException e) {
+				socket = null;
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			if (!timeout && response != null) {
+				ElapsedTime.stop("PingRaw_UDPTotalDelay");
+			} else if (response == null){
+				ElapsedTime.abort("PingRaw_UDPTotalDelay");
+			} else {
+				timeout = false;
+			}
+			response = null;
+			if (socket != null){
+				try {
+					socket.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		} 
+		return ElapsedTime.get("PingRaw_UDPTotalDelay");
 	}
 }
