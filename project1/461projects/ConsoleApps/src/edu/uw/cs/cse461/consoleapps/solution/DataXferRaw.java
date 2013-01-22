@@ -1,6 +1,7 @@
 package edu.uw.cs.cse461.consoleapps.solution;
 
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -9,6 +10,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 import edu.uw.cs.cse461.consoleapps.DataXferInterface.DataXferRawInterface;
 import edu.uw.cs.cse461.net.base.NetBase;
@@ -16,6 +19,7 @@ import edu.uw.cs.cse461.net.base.NetLoadable.NetLoadableConsoleApp;
 import edu.uw.cs.cse461.service.DataXferRawService;
 import edu.uw.cs.cse461.service.DataXferServiceBase;
 import edu.uw.cs.cse461.util.ConfigManager;
+import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTime;
 import edu.uw.cs.cse461.util.SampledStatistic.TransferRate;
 import edu.uw.cs.cse461.util.SampledStatistic.TransferRateInterval;
 
@@ -37,7 +41,6 @@ public class DataXferRaw extends NetLoadableConsoleApp implements DataXferRawInt
 	 */
 	@Override
 	public void run() {
-		
 		try {
 
 			// Eclipse doesn't support System.console()
@@ -120,7 +123,71 @@ public class DataXferRaw extends NetLoadableConsoleApp implements DataXferRawInt
 	 */
 	@Override
 	public byte[] udpDataXfer(byte[] header, String hostIP, int udpPort, int socketTimeout, int xferLength) throws IOException {
-		return null;
+		DatagramSocket socket = null;
+		DatagramPacket packet = null;
+
+		byte[] response = new byte[xferLength];
+		int offset = 0;
+		try 
+		{
+			socket = new DatagramSocket();
+
+			InetSocketAddress address = new InetSocketAddress(hostIP, udpPort);
+			packet = new DatagramPacket(header, header.length, address.getAddress(), udpPort);
+			socket.send(packet);
+			
+            // get response
+			byte[] buf = new byte[1000];
+			packet = new DatagramPacket(buf, buf.length);
+			socket.setSoTimeout(socketTimeout);
+
+			while(offset < xferLength)
+			{
+				socket.receive(packet);
+				byte[] data = packet.getData();
+				
+				for(int i = 0; i < data.length; i++)
+				{
+					if((offset < xferLength) && (data[i] != 0))
+					{
+						response[offset] = data[i];
+						offset++;
+					}
+				}
+				
+				//'okay' header plus null terminator
+				offset += 5;
+				
+				//null terminator for response string
+				offset += 1;
+			}
+		} 
+		catch (SocketTimeoutException e)
+		{
+			if(response.length == 0)
+			{
+				throw new SocketTimeoutException("Server timed out");
+			}
+		}
+		catch (SocketException e)
+		{
+			socket = null;
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		if (socket != null)
+		{
+			socket.close();
+		}
+
+		if(offset != xferLength)
+		{
+			throw new IOException("not enough data returned");
+		}
+		return response;
 	}
 	
 	/**
@@ -154,8 +221,71 @@ public class DataXferRaw extends NetLoadableConsoleApp implements DataXferRawInt
 	 * Method to actually transfer data over TCP, without measuring performance.
 	 */
 	@Override
-	public byte[] tcpDataXfer(byte[] header, String hostIP, int tcpPort, int socketTimeout, int xferLength) throws IOException {
-		return null;
+	public byte[] tcpDataXfer(byte[] header, String hostIP, int tcpPort, int socketTimeout, int xferLength) throws IOException 
+	{
+		final int BUF_SIZE = 1000;
+		
+		Socket socket = null;
+		char[] cbuf = new char[BUF_SIZE];
+		byte[] response = new byte[xferLength];
+		int offset = 0;
+		
+		try 
+		{
+			socket = new Socket(hostIP, tcpPort);
+			BufferedReader in = new BufferedReader(new
+		    InputStreamReader(socket.getInputStream()));
+			OutputStream out = new DataOutputStream(socket.getOutputStream());
+			socket.setSoTimeout(socketTimeout);
+			
+			out.write(header);
+			int chars_read = in.read(cbuf);
+			while(chars_read > 0)
+			{
+				for(int i = 0; i < chars_read; i++)
+				{
+					if((cbuf[i] != 0) && (offset < response.length))
+					{
+						response[offset] = (byte) cbuf[i];
+					}
+					offset++;
+				}
+				chars_read = in.read(cbuf);
+			}
+			//don't count the header
+			offset -= 4;
+		}
+	    catch (SocketTimeoutException e) 
+	    {
+	    	throw new SocketTimeoutException("Server timed out");
+	    }
+		catch (SocketException e)
+		{
+			socket = null;
+		}
+		catch (Exception e) 
+		{
+			e.printStackTrace();
+		}
+			
+		if (socket != null)
+		{
+			try 
+			{
+				socket.close();
+			} 
+			catch (IOException e) 
+			{
+				e.printStackTrace();
+			}
+		}
+
+		if(offset != xferLength)
+		{
+			throw new IOException("not enough data returned");
+		}
+		
+		return response;
 	}
 	
 	/**
@@ -174,7 +304,6 @@ public class DataXferRaw extends NetLoadableConsoleApp implements DataXferRawInt
 				TransferRate.stop("tcp", xferLength);
 			} catch (Exception e) {
 				TransferRate.abort("tcp", xferLength);
-				//System.out.println("TCP trial failed: " + e.getMessage());
 			}
 		
 		}
