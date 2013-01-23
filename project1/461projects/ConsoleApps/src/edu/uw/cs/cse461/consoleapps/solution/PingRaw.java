@@ -18,6 +18,7 @@ import edu.uw.cs.cse461.net.base.NetBase;
 import edu.uw.cs.cse461.net.base.NetLoadable.NetLoadableConsoleApp;
 import edu.uw.cs.cse461.service.EchoServiceBase;
 import edu.uw.cs.cse461.util.ConfigManager;
+import edu.uw.cs.cse461.util.Log;
 import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTime;
 import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTimeInterval;
 
@@ -113,6 +114,7 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 	public ElapsedTimeInterval udpPing(byte[] header, String hostIP, int udpPort, int socketTimeout, int nTrials){
 		DatagramSocket socket = null;
 		DatagramPacket packet = null;
+		
 		for (int i = 0; i < nTrials; i++) {
 			ElapsedTime.start("PingRaw_UDPTotalDelay");
 			try {
@@ -127,21 +129,32 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 				packet = new DatagramPacket(buf, buf.length);
 				socket.setSoTimeout(socketTimeout);
 				socket.receive(packet);
+				
+				String headerString = "okay";
+				if ( packet.getLength() < headerString.length() )
+					throw new Exception("Bad header: length = " + packet.getLength());
+				String headerStr = new String( buf, 0, headerString.length() );
+				if ( ! headerStr.equalsIgnoreCase(headerString) )
+					throw new Exception("Bad header: got '" + headerStr + "', wanted '" + headerString + "'");
+				
 			} catch (SocketTimeoutException e) {
 				ElapsedTime.abort("PingRaw_UDPTotalDelay");
 				packet = null;
+				System.out.println("Dgram reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
 			} catch (SocketException e) {
 				socket = null;
-			} catch (Exception e) {
+			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
-			
-			if(packet != null) {
-				ElapsedTime.stop("PingRaw_UDPTotalDelay");
-			}
-			if (socket != null){
-				socket.close();
+			} catch (Exception e) {
+				System.out.println("Dgram reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
+			} finally {
+				if(packet != null) {
+					ElapsedTime.stop("PingRaw_UDPTotalDelay");
+				}
+				if (socket != null){
+					socket.close();
+				}
 			}
 		} 
 		return ElapsedTime.get("PingRaw_UDPTotalDelay");
@@ -149,11 +162,11 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 	
 	@Override
 	public ElapsedTimeInterval tcpPing(byte[] header, String hostIP, int tcpPort, int socketTimeout, int nTrials) {
-		Socket socket = null;
+		Socket socket = null;	
 		boolean timeout = false;
 		String response = null;
 		for (int i = 0; i < nTrials; i++) {
-			ElapsedTime.start("PingRaw_UDPTotalDelay");
+			ElapsedTime.start("PingRaw_TCPTotalDelay");
 			try {
 				socket = new Socket(hostIP, tcpPort);
 				
@@ -165,33 +178,39 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 				
 				out.write(header);
 				response = in.readLine();
+				
+				String headerString = "okay";
+				if ( response != null && !response.equalsIgnoreCase(headerString) )
+					throw new Exception("Bad header: got '" + response + "', wanted '" + headerString + "'");
 			} catch (SocketTimeoutException e) {
-				ElapsedTime.abort("PingRaw_UDPTotalDelay");
+				ElapsedTime.abort("PingRaw_TCPTotalDelay");
 				timeout = true;
+				System.out.println("Socket reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
 			} catch (SocketException e) {
 				socket = null;
-			} catch (Exception e) {
+			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
-			
-			if (!timeout && response != null) {
-				ElapsedTime.stop("PingRaw_UDPTotalDelay");
-			} else if (response == null){
-				ElapsedTime.abort("PingRaw_UDPTotalDelay");
-			} else {
-				timeout = false;
-			}
-			response = null;
-			if (socket != null){
-				try {
-					socket.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			}  catch (Exception e) {
+			} finally {
+				if (!timeout && response != null) {
+					ElapsedTime.stop("PingRaw_TCPTotalDelay");
+				} else if (response == null){
+					ElapsedTime.abort("PingRaw_TCPTotalDelay");
+				} else {
+					timeout = false;
+				}
+				response = null;
+				if (socket != null){
+					try {
+						socket.close();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 			}
 		} 
-		return ElapsedTime.get("PingRaw_UDPTotalDelay");
+		return ElapsedTime.get("PingRaw_TCPTotalDelay");
 	}
 }
