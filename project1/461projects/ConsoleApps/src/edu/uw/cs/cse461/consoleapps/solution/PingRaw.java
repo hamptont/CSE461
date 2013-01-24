@@ -114,22 +114,24 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 	public ElapsedTimeInterval udpPing(byte[] header, String hostIP, int udpPort, int socketTimeout, int nTrials){
 		DatagramSocket socket = null;
 		DatagramPacket packet = null;
-		
+
 		for (int i = 0; i < nTrials; i++) {
 			ElapsedTime.start("PingRaw_UDPTotalDelay");
 			try {
 				socket = new DatagramSocket();
 
+				//Sends the ping packet to the server
 				InetSocketAddress address = new InetSocketAddress(hostIP, udpPort);
 				packet = new DatagramPacket(header, header.length, address.getAddress(), udpPort);
 				socket.send(packet);
 				
-	            	// get response
+	            //Receives the response from the server.
 				byte[] buf = new byte[4];
 				packet = new DatagramPacket(buf, buf.length);
 				socket.setSoTimeout(socketTimeout);
 				socket.receive(packet);
 				
+				//Checks for valid responses
 				String headerString = "okay";
 				if ( packet.getLength() < headerString.length() )
 					throw new Exception("Bad header: length = " + packet.getLength());
@@ -149,9 +151,13 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 			} catch (Exception e) {
 				System.out.println("Dgram reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
 			} finally {
+				
+				//Successfully timed packet.
 				if(packet != null) {
 					ElapsedTime.stop("PingRaw_UDPTotalDelay");
 				}
+				
+				//As long the socket still exists, close it.
 				if (socket != null){
 					socket.close();
 				}
@@ -165,20 +171,25 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 		Socket socket = null;	
 		boolean timeout = false;
 		String response = null;
+		
 		for (int i = 0; i < nTrials; i++) {
 			ElapsedTime.start("PingRaw_TCPTotalDelay");
 			try {
 				socket = new Socket(hostIP, tcpPort);
 				
-	            	// get response
+	            //Sets up socket i/o streams
 				BufferedReader in = new BufferedReader(new
 			            InputStreamReader(socket.getInputStream()));
 				OutputStream out = new DataOutputStream(socket.getOutputStream());
 				socket.setSoTimeout(socketTimeout);
 				
+				//Writes to the server
 				out.write(header);
+				
+				//Receives from the server
 				response = in.readLine();
 				
+				//Checks for valid responses
 				String headerString = "okay";
 				if ( response != null && !response.equalsIgnoreCase(headerString) )
 					throw new Exception("Bad header: got '" + response + "', wanted '" + headerString + "'");
@@ -193,6 +204,8 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 				e.printStackTrace();
 			}  catch (Exception e) {
 			} finally {
+				
+				//Handles timer appropriately
 				if (!timeout && response != null) {
 					ElapsedTime.stop("PingRaw_TCPTotalDelay");
 				} else if (response == null){
@@ -201,6 +214,8 @@ public class PingRaw extends NetLoadableConsoleApp implements PingRawInterface {
 					timeout = false;
 				}
 				response = null;
+				
+				//Clean up socket
 				if (socket != null){
 					try {
 						socket.close();
