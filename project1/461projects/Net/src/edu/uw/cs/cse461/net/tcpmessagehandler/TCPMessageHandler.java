@@ -16,6 +16,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -75,7 +76,10 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	protected static int byteToInt(byte buf[]) {
 		//TODO You need to implement this.  It's the inverse of intToByte().
-		return 0;
+		ByteBuffer b = ByteBuffer.allocate(4);
+		b.order(ByteOrder.LITTLE_ENDIAN);
+		b.put(buf);
+		return b.getInt();
 	}
 
 	/**
@@ -156,10 +160,13 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		OutputStream out = new DataOutputStream(this.socket.getOutputStream());
 		this.socket.setSoTimeout(this.timeout);
 		this.socket.setTcpNoDelay(this.noDelay);
+		
+		byte[] len = intToByte(buf.length);
 		//Write to server
-		if(this.maxReadLength >= buf.length) {
+	//	if(this.maxReadLength >= buf.length) {
+			out.write(len);
 			out.write(buf);
-		} 
+	//	} 
 	}
 	
 	/**
@@ -206,14 +213,30 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	@Override
 	public byte[] readMessageAsBytes() throws IOException {
 		//Read response
+		System.out.println("a");
 		BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 		
+		char[] char_response = new char[4];
+		System.out.println("aa");
+		int chars_read = in.read(char_response);
+		System.out.println("aaa");
+		if(chars_read != 4){
+			System.out.println("Bad header length");
+		}
+		byte[] response = new byte[4];
+		for(int i = 0; i < 4; i++) {
+			response[i] = (byte) char_response[i];
+		}
+		int len = byteToInt(response);
+		System.out.println("LENGTH" + len);
+
 		final int BUF_SIZE = 1000;
 		char[] cbuf = new char[BUF_SIZE];
 		int offset = 0;
-		byte[] response = new byte[this.maxReadLength];
+		response = new byte[len];
 
-		int chars_read = in.read(cbuf);
+		System.out.println("about to read");
+		chars_read = in.read(cbuf);
 		System.out.println("CHAR READ (init): " + chars_read);
 		while(chars_read > 0)
 		{
