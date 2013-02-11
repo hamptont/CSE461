@@ -20,14 +20,7 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 
 	public PingTCPMessageHandler() {
 		super("PingTCPMessageHandler");
-		System.out.println("CONSTRUCTOR");
-		Socket s = new Socket();
-		try {
-			TCPMessageHandler  handler = new TCPMessageHandler(s);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		System.out.println("Ping TCP Message Handler - CONSTRUCTOR");
 	}
 	
 	public ElapsedTimeInterval ping(String header, String hostIP, int port, int timeout, int nTrials) throws Exception
@@ -36,10 +29,15 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 		boolean socket_timeout = false;
 		String response = null;
 		
+		TCPMessageHandler handler = null;
+		
 		for (int i = 0; i < nTrials; i++) {
 			ElapsedTime.start("PingTCPMessageHandler");
 			try {
 				socket = new Socket(hostIP, port);
+				handler = new TCPMessageHandler(socket);
+				
+				handler.sendMessage("");
 				/*
 	            //Sets up socket i/o streams
 				BufferedReader in = new BufferedReader(new
