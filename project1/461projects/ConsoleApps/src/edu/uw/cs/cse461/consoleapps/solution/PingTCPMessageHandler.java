@@ -22,12 +22,12 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 		super("PingTCPMessageHandler");
 		System.out.println("Ping TCP Message Handler - CONSTRUCTOR");
 	}
-	
+
 	public ElapsedTimeInterval ping(String header, String hostIP, int port, int timeout, int nTrials) throws Exception
 	{
 		Socket socket = null;	
 		boolean socket_timeout = false;
-		String response = null;
+		byte[] response = null;
 		
 		TCPMessageHandler handler = null;
 		
@@ -36,54 +36,39 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 			try {
 				socket = new Socket(hostIP, port);
 				handler = new TCPMessageHandler(socket);
-				
-				handler.sendMessage("");
-				/*
-	            //Sets up socket i/o streams
-				BufferedReader in = new BufferedReader(new
-			            InputStreamReader(socket.getInputStream()));
-				OutputStream out = new DataOutputStream(socket.getOutputStream());
-				socket.setSoTimeout(timeout);
-				
-				//Writes to the server
-			//	out.write(header);
-				
-				//Receives from the server
-				response = in.readLine();
-				
-				//Checks for valid responses
-				String headerString = "okay";
-				if ( response != null && !response.equalsIgnoreCase(headerString) )
-					throw new Exception("Bad header: got '" + response + "', wanted '" + headerString + "'");
-				*/
+				handler.setTimeout(timeout);
+				byte[] msg = header.getBytes();
+				handler.sendMessage(msg);		
+				response = handler.readMessageAsBytes();
+				System.out.println("response length: " + response.length);
+				System.out.println("RESPONSE: " + response.toString());
 			} catch (SocketTimeoutException e) {
+				System.out.println("TIME OUT!");
 				ElapsedTime.abort("PingTCPMessageHandler");
 				socket_timeout = true;
 				System.out.println("Socket reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
 			} catch (SocketException e) {
+				System.out.println("socket exception");
 				socket = null;
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}  catch (Exception e) {
-			} finally {
 				
+			} finally {				
 				//Handles timer appropriately
-				if (!socket_timeout && response != null) {
+				if (!socket_timeout && response.length == 0) {
 					ElapsedTime.stop("PingTCPMessageHandler");
-				} else if (response == null){
+				} else if (response.length != 0){
 					ElapsedTime.abort("PingTCPMessageHandler");
 				} else {
 					socket_timeout = false;
 				}
 				response = null;
-				
 				//Clean up socket
 				if (socket != null){
 					try {
 						socket.close();
 					} catch (IOException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}

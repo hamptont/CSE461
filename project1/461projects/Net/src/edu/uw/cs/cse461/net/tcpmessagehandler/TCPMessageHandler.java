@@ -1,10 +1,16 @@
 package edu.uw.cs.cse461.net.tcpmessagehandler;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
@@ -35,6 +41,12 @@ import edu.uw.cs.cse461.util.Log;
 public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	private static final String TAG="TCPMessageHandler";
 	
+	//Init in the constructor
+	private Socket socket; 
+	private int timeout;
+	private boolean noDelay;
+	private int maxReadLength;
+	
 	//--------------------------------------------------------------------------------------
 	// helper routines
 	//--------------------------------------------------------------------------------------
@@ -62,7 +74,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 * @return 
 	 */
 	protected static int byteToInt(byte buf[]) {
-		// You need to implement this.  It's the inverse of intToByte().
+		//TODO You need to implement this.  It's the inverse of intToByte().
 		return 0;
 	}
 
@@ -72,12 +84,23 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 * @throws IOException
 	 */
 	public TCPMessageHandler(Socket sock) throws IOException {
+		this.socket = sock; 
+		this.timeout = 1000;
+		this.noDelay = false;
+		this.maxReadLength = 100000;
 	}
 	
 	/**
 	 * Closes the underlying socket and renders this TCPMessageHandler useless.
 	 */
 	public void close() {
+		if(this.socket != null) {
+			try {
+				this.socket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	/**
@@ -87,7 +110,9 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public int setTimeout(int timeout) throws SocketException {
-		return 0;
+		int old_timeout = this.timeout;
+		this.timeout = timeout;
+		return old_timeout;
 	}
 	
 	/**
@@ -97,7 +122,9 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public boolean setNoDelay(boolean value) throws SocketException {
-		return false;
+		boolean old_noDelay = this.noDelay;
+		this.noDelay = value;
+		return old_noDelay;
 	}
 	
 	/**
@@ -106,7 +133,9 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public int setMaxReadLength(int maxLen) {
-		return 0;
+		int old_maxReadLength = this.maxReadLength;
+		this.maxReadLength = maxLen;
+		return old_maxReadLength;
 	}
 
 	/**
@@ -114,7 +143,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public int getMaxReadLength() {
-		return 0;
+		return this.maxReadLength;
 	}
 	
 	//--------------------------------------------------------------------------------------
@@ -122,7 +151,15 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	//--------------------------------------------------------------------------------------
 	
 	@Override
-	public void sendMessage(byte[] buf) throws IOException {
+	public void sendMessage(byte[] buf) throws IOException {		
+		//Set up socket and streams
+		OutputStream out = new DataOutputStream(this.socket.getOutputStream());
+		this.socket.setSoTimeout(this.timeout);
+		this.socket.setTcpNoDelay(this.noDelay);
+		//Write to server
+		if(this.maxReadLength >= buf.length) {
+			out.write(buf);
+		} 
 	}
 	
 	/**
@@ -130,6 +167,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(String str) throws IOException {
+		byte[] buf = str.getBytes();
+		sendMessage(buf);
 	}
 
 	/**
@@ -137,6 +176,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(int value) throws IOException{
+		byte[] buf = null; //TODO convert int to byte[]
+		sendMessage(buf);
 	}
 	
 	/**
@@ -144,6 +185,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONArray jsArray) throws IOException {
+		byte[] buf = null; //TODO convert JSONArray to byte[]
+		sendMessage(buf);
 	}
 	
 	/**
@@ -151,6 +194,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONObject jsObject) throws IOException {
+		byte[] buf = null; //TODO convert JSONObject to byte[]
+		sendMessage(buf);
 	}
 	
 	//--------------------------------------------------------------------------------------
@@ -160,26 +205,54 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	
 	@Override
 	public byte[] readMessageAsBytes() throws IOException {
-		return null;
+		//Read response
+		BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		
+		final int BUF_SIZE = 1000;
+		char[] cbuf = new char[BUF_SIZE];
+		int offset = 0;
+		byte[] response = new byte[this.maxReadLength];
+
+		int chars_read = in.read(cbuf);
+		System.out.println("CHAR READ (init): " + chars_read);
+		while(chars_read > 0)
+		{
+			System.out.println("CHAR READ: " + chars_read);
+			for(int i = 0; i < chars_read; i++)
+			{
+				if((cbuf[i] != 0) && (offset < response.length))
+				{
+					response[offset] = (byte) cbuf[i];
+				}
+				offset++;
+			}
+			chars_read = in.read(cbuf);
+		}
+
+		return response;
 	}
 	
 	@Override
 	public String readMessageAsString() throws IOException {
-		return null;
+		byte[] buf = readMessageAsBytes();
+		return buf.toString();
 	}
 
 	@Override
 	public int readMessageAsInt() throws IOException {
-		return 0;
+		byte[] buf = readMessageAsBytes();
+		return 0; // TODO convert to int
 	}
 	
 	@Override
 	public JSONArray readMessageAsJSONArray() throws IOException, JSONException {
-		return null;
+		byte[] buf = readMessageAsBytes();
+		return null; // TODO convert to JSONArray
 	}
 	
 	@Override
 	public JSONObject readMessageAsJSONObject() throws IOException, JSONException {
-		return null;
+		byte[] buf = readMessageAsBytes();
+		return null; // TODO convert to JSONObject
 	}
 }
