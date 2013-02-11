@@ -39,11 +39,14 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				handler.setTimeout(timeout);
 				byte[] msg = header.getBytes();
 				handler.sendMessage(msg);		
+				handler.sendMessage(new byte[0]);		
 				System.out.println("!!!");
 				response = handler.readMessageAsBytes();
 				System.out.println("!!!!");
 				System.out.println("response length: " + response.length);
-				System.out.println("RESPONSE: " + response.toString());
+				for(int j = 0; j < response.length; j++){
+					System.out.println("response: " + response[j]);
+				}
 
 			} catch (SocketTimeoutException e) {
 				System.out.println("TIME OUT!");
@@ -59,10 +62,10 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				
 			} finally {				
 				//Handles timer appropriately
-				if (!socket_timeout && response.length == 0) {
+				if (!socket_timeout) {
 					ElapsedTime.stop("PingTCPMessageHandler");
-				} else if (response.length != 0){
-					ElapsedTime.abort("PingTCPMessageHandler");
+			//	} else if (response.length != 0){
+			//		ElapsedTime.abort("PingTCPMessageHandler");
 				} else {
 					socket_timeout = false;
 				}
