@@ -219,7 +219,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 
 		int chars_read = in.read(response, 0, 4);
 		if(chars_read != 4) {
-			System.out.println("Did not read int");
+			System.out.println("Did not read int: " + new String(response));
 		}
 		
 		byte[] responseLength = new byte[4];

@@ -29,6 +29,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 	
 	public byte[] DataXfer(String header, String hostIP, int port, int timeout, int xferLength) throws JSONException, IOException {
 		System.out.println("DATAXfer called!");
+		
 		Socket tcpSocket = null;
 		TCPMessageHandler tcpMessageHandlerSocket = null;
 		byte[] response = new byte[0];
@@ -44,6 +45,8 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			JSONObject json = new JSONObject();
 			json.put("transferSize", xferLength);
 			tcpMessageHandlerSocket.sendMessage(json);
+			
+			System.out.println("DONE SENDING Xfer");
 			
 			// read response header
 			String headerStr = tcpMessageHandlerSocket.readMessageAsString();
@@ -66,7 +69,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			}
 			response = new byte[count]; //hack -- should be the actual bytes returned
 			if (count != xferLength) {
-				throw new Exception("Bad response payload: expected " + xferLength + "bytes, received " + charsRead + "bytes.");
+				throw new Exception("Bad response payload: expected " + xferLength + "bytes, received " + charsRead + " bytes.");
 			}
 			
 		} catch (SocketTimeoutException e) {
