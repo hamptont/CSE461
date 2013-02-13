@@ -47,7 +47,6 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				for(int j = 0; j < response.length; j++){
 					System.out.println("response: " + response[j]);
 				}
-
 			} catch (SocketTimeoutException e) {
 				System.out.println("TIME OUT!");
 				ElapsedTime.abort("PingTCPMessageHandler");

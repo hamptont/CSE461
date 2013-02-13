@@ -7,6 +7,8 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 
 import org.json.JSONException;
+import org.json.JSONObject;
+
 import edu.uw.cs.cse461.consoleapps.DataXferInterface.DataXferTCPMessageHandlerInterface;
 import edu.uw.cs.cse461.net.base.NetBase;
 import edu.uw.cs.cse461.net.base.NetLoadable.NetLoadableConsoleApp;
@@ -26,47 +28,84 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 	}
 	
 	public byte[] DataXfer(String header, String hostIP, int port, int timeout, int xferLength) throws JSONException, IOException {
+		System.out.println("DATAXfer called!");
 		Socket tcpSocket = null;
 		TCPMessageHandler tcpMessageHandlerSocket = null;
-		byte[] response = null;
-		
+		byte[] response = new byte[0];
+
 		try {
 			tcpSocket = new Socket(hostIP, port);
 			tcpMessageHandlerSocket = new TCPMessageHandler(tcpSocket);
 			tcpMessageHandlerSocket.setTimeout(timeout);
 			tcpMessageHandlerSocket.setNoDelay(true);
 
-			tcpMessageHandlerSocket.sendMessage(EchoServiceBase.HEADER_STR);
+			tcpMessageHandlerSocket.sendMessage(header);
 			
-			byte[] msg = new byte[xferLength];
-			tcpMessageHandlerSocket.sendMessage(msg);
+			JSONObject json = new JSONObject();
+			json.put("transferSize", xferLength);
+			tcpMessageHandlerSocket.sendMessage(json);
 			
 			// read response header
 			String headerStr = tcpMessageHandlerSocket.readMessageAsString();
-			if ( ! headerStr.equalsIgnoreCase(EchoServiceBase.RESPONSE_OKAY_STR) )
+			System.out.println("headerstr: " + headerStr);
+			if (!headerStr.equalsIgnoreCase("OKAY")) {
 				throw new Exception("Bad response header: '" + headerStr + "'");
+			}
 
-			// read response payload (which should be empty)
 			String responseStr = tcpMessageHandlerSocket.readMessageAsString();
-			if ( !  responseStr.equals(msg)) {
-				throw new Exception("Bad response payload: sent '" + msg + "' got back '" + response + "'");
+
+			System.out.println("RESPONSE str: " + responseStr);
+			int charsRead = responseStr.length();
+			int count = charsRead;
+			while(charsRead > 0){
+				responseStr = tcpMessageHandlerSocket.readMessageAsString();
+				charsRead = responseStr.length();
+				count += charsRead;
+				System.out.println("RESPONSE STR: " + responseStr);
+				System.out.println("count" + count);
+			}
+			response = new byte[count]; //hack -- should be the actual bytes returned
+			if (count != xferLength) {
+				throw new Exception("Bad response payload: expected " + xferLength + "bytes, received " + charsRead + "bytes.");
 			}
 			
-			response = responseStr.getBytes();
-
 		} catch (SocketTimeoutException e) {
 			System.out.println("Timed out");
 		} catch (Exception e) {
 			System.out.println("TCPMessageHandler read failed: " + e.getMessage());
 		} finally {
-			if ( tcpMessageHandlerSocket != null ) try { tcpMessageHandlerSocket.close(); } catch (Exception e) {}
+			if(tcpMessageHandlerSocket != null){
+				try{
+					tcpMessageHandlerSocket.close();
+				}catch (Exception e) {
+					
+				}
+			}
 		}
 		
 		return response;
 	}
 	
 	public TransferRateInterval DataXferRate(String header, String hostIP, int port, int timeout, int xferLength, int nTrials) {
-		return null;
+		System.out.println("DataXferRate called!");
+		
+		for(int i = 0; i < nTrials; i++) {
+			try {
+				TransferRate.start("DataXferRate");
+				byte[] msg = DataXfer(header, hostIP, port, timeout, xferLength);
+				if(msg.length == xferLength){
+					TransferRate.stop("DataXferRate", xferLength);
+				}else{
+					TransferRate.abort("DataXferRate", xferLength);
+				}
+			} catch ( java.net.SocketTimeoutException e) {
+				TransferRate.abort("DataXferRate", xferLength);
+			} catch (Exception e) {
+				TransferRate.abort("DataXferRate", xferLength);
+			}
+		}
+		
+		return TransferRate.get("DataXferRate");
 	}
 	
 	@Override
