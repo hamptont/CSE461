@@ -77,9 +77,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	protected static int byteToInt(byte buf[]) {
 		//TODO You need to implement this.  It's the inverse of intToByte().
-		ByteBuffer b = ByteBuffer.allocate(4);
+		ByteBuffer b = ByteBuffer.wrap(buf);
 		b.order(ByteOrder.LITTLE_ENDIAN);
-		b.put(buf);
 		return b.getInt();
 	}
 
@@ -163,6 +162,9 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		this.socket.setTcpNoDelay(this.noDelay);
 		
 		byte[] len = intToByte(buf.length);
+		int lenInt = byteToInt(len);
+		System.out.println(lenInt);
+		
 		out.write(len);
 		out.write(buf);
 	}
@@ -172,7 +174,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(String str) throws IOException {
-		System.out.println("null send method 1");
 		byte[] buf = str.getBytes();
 		sendMessage(buf);
 	}
@@ -182,7 +183,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(int value) throws IOException{
-		System.out.println("null send method 2");
 		byte[] buf = intToByte(value); 
 		sendMessage(buf);
 	}
@@ -192,7 +192,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONArray jsArray) throws IOException {
-		System.out.println("null send method 3");
 		byte[] buf = jsArray.toString().getBytes(); 
 		sendMessage(buf);
 	}
@@ -202,7 +201,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONObject jsObject) throws IOException {
-		System.out.println("json send method 4");
 		byte[] buf = jsObject.toString().getBytes();
 		sendMessage(buf);
 	}
@@ -219,15 +217,32 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		this.socket.setTcpNoDelay(this.noDelay);
 		BufferedReader in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 
-		char[] response = new char[this.maxReadLength];
-		System.out.println("aa");
+		char[] response = new char[4];
 
-		int chars_read = in.read(response);
-		System.out.println("RESPONSE LEN: " + chars_read);
+		int chars_read = in.read(response, 0, 4);
+		if(chars_read != 4) {
+			System.out.println("Did not read int");
+		}
+		
+		byte[] responseLength = new byte[4];
+		for(int i = 0; i < 4; i++) {
+			responseLength[i] = (byte)response[i];
+		}
+				
+		int length = byteToInt(responseLength);
+		System.out.println("length: " + length);
 
-		byte[] header_response = new byte[this.maxReadLength];
-		for(int i = 0; i < this.maxReadLength; i++) {
-			header_response[i] = (byte) header_response[i];
+		
+		char[] char_header_response = new char[length];
+		chars_read = in.read(char_header_response, 0, length);
+		
+		if(chars_read != length) {
+			System.out.println("Did not read enough bytes");
+		}
+		
+		byte[] header_response = new byte[length];
+		for(int i = 0; i < length; i++) {
+			header_response[i] = (byte) char_header_response[i];
 		}
 
 		return header_response;
@@ -235,33 +250,28 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	
 	@Override
 	public String readMessageAsString() throws IOException {
-		System.out.println("null read method 1");
 		byte[] buf = readMessageAsBytes();
-		return buf.toString();
+		return new String(buf);
 	}
 
 	@Override
 	public int readMessageAsInt() throws IOException {
-		System.out.println("null read method 2");
 		byte[] buf = readMessageAsBytes();
 		return byteToInt(buf);
 	}
 	
 	@Override
 	public JSONArray readMessageAsJSONArray() throws IOException, JSONException {
-		System.out.println("null read method 3");
 		byte[] buf = readMessageAsBytes();
-		String s = buf.toString();
+		String sourceStr = new String(buf);
 		
-		
-		return null; //TODO String to JSONArray
+		return new JSONArray(sourceStr); //TODO String to JSONArray
 	}
 	
 	@Override
 	public JSONObject readMessageAsJSONObject() throws IOException, JSONException {
-		System.out.println("null read method 4");
 		byte[] buf = readMessageAsBytes();
-		String s = buf.toString();
-		return null; // TODO String to JSONObject
+		String sourceStr = new String(buf);
+		return new JSONObject(sourceStr); // TODO String to JSONObject
 	}
 }
