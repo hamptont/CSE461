@@ -27,6 +27,7 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 	{
 		Socket socket = null;	
 		boolean socket_timeout = false;
+		boolean bad_header = false;
 		String response = null;
 		
 		TCPMessageHandler handler = null;
@@ -37,16 +38,16 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				socket = new Socket(hostIP, port);
 				handler = new TCPMessageHandler(socket);
 				handler.setTimeout(timeout);
+				
 				handler.sendMessage(header);		
-				handler.sendMessage("");		
-				System.out.println("!!!");
+				handler.sendMessage("");
+				
 				response = handler.readMessageAsString();
-				System.out.println("!!!!");
-				System.out.println("response length: " + response.length());
-				System.out.println("response: " + response);
+				if(!response.equals("okay")) {
+					bad_header = true;
+				}
 
 			} catch (SocketTimeoutException e) {
-				System.out.println("TIME OUT!");
 				ElapsedTime.abort("PingTCPMessageHandler");
 				socket_timeout = true;
 				System.out.println("Socket reading thread caught " + e.getClass().getName() + " exception: " + e.getMessage());
@@ -59,13 +60,14 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				
 			} finally {				
 				//Handles timer appropriately
-				if (!socket_timeout) {
+				if (!socket_timeout && !bad_header) {
 					ElapsedTime.stop("PingTCPMessageHandler");
-			//	} else if (response.length != 0){
-			//		ElapsedTime.abort("PingTCPMessageHandler");
 				} else {
-					socket_timeout = false;
+					ElapsedTime.abort("PingTCPMessageHandler");
 				}
+				
+				socket_timeout = false;
+				bad_header = false;
 				response = null;
 				//Clean up socket
 				if (socket != null){

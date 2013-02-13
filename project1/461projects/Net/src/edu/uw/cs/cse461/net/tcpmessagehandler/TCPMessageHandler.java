@@ -162,8 +162,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		this.socket.setTcpNoDelay(this.noDelay);
 		
 		byte[] len = intToByte(buf.length);
-		int lenInt = byteToInt(len);
-		System.out.println(lenInt);
 		
 		out.write(len);
 		out.write(buf);
@@ -230,8 +228,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		}
 				
 		int length = byteToInt(responseLength);
-		System.out.println("length: " + length);
-
 		
 		char[] char_header_response = new char[length];
 		chars_read = in.read(char_header_response, 0, length);
