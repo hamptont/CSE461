@@ -44,9 +44,7 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				response = handler.readMessageAsBytes();
 				System.out.println("!!!!");
 				System.out.println("response length: " + response.length);
-				for(int j = 0; j < response.length; j++){
-					System.out.println("response: " + response[j]);
-				}
+
 			} catch (SocketTimeoutException e) {
 				System.out.println("TIME OUT!");
 				ElapsedTime.abort("PingTCPMessageHandler");
