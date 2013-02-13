@@ -216,19 +216,25 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		BufferedReader in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 
 		char[] response = new char[4];
-
+		
 		int chars_read = in.read(response, 0, 4);
+		System.out.println("chars read: " + chars_read);
+
 		if(chars_read != 4) {
 			System.out.println("Did not read int: " + new String(response));
 		}
-		
+		else 
+		{
+			System.out.println("Read int: " + new String(response));
+		}
+
 		byte[] responseLength = new byte[4];
 		for(int i = 0; i < 4; i++) {
 			responseLength[i] = (byte)response[i];
 		}
-				
+
 		int length = byteToInt(responseLength);
-		
+		System.out.println("length: " + length);
 		char[] char_header_response = new char[length];
 		chars_read = in.read(char_header_response, 0, length);
 		
