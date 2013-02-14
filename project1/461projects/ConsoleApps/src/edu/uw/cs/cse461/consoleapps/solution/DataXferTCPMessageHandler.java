@@ -27,12 +27,10 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 		super("DataXferTCPMessageHandler");
 	}
 	
-	public byte[] DataXfer(String header, String hostIP, int port, int timeout, int xferLength) throws JSONException, IOException {
-		System.out.println("DATAXfer called!");
-		
+	public byte[] DataXfer(String header, String hostIP, int port, int timeout, int xferLength) throws JSONException, IOException {		
 		Socket tcpSocket = null;
 		TCPMessageHandler tcpMessageHandlerSocket = null;
-		byte[] response = new byte[0];
+		StringBuffer buf = new StringBuffer();
 
 		try {
 			tcpSocket = new Socket(hostIP, port);
@@ -45,34 +43,26 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			JSONObject json = new JSONObject();
 			json.put("transferSize", new Integer(xferLength));
 			tcpMessageHandlerSocket.sendMessage(json);
-			
-			System.out.println("DONE SENDING Xfer");
-			
+						
 			// read response header
 			String headerStr = tcpMessageHandlerSocket.readMessageAsString();
-			System.out.println("headerstr: " + headerStr);
 			if (!headerStr.equalsIgnoreCase("OKAY")) {
 				throw new Exception("Bad response header: '" + headerStr + "'");
 			}
-
+			
 			String responseStr = tcpMessageHandlerSocket.readMessageAsString();
-
-			System.out.println("RESPONSE str: " + responseStr);
+			buf.append(responseStr);
 			int charsRead = responseStr.length();
 			int count = charsRead;
 			while(charsRead > 0 && count < xferLength){
 				responseStr = tcpMessageHandlerSocket.readMessageAsString();
 				charsRead = responseStr.length();
 				count += charsRead;
-			//	System.out.println("RESPONSE STR: " + responseStr);
-			//	System.out.println("count" + count);
+				buf.append(responseStr);
 			}
-			System.out.println("FINAL COUNT: " + count);
-			response = new byte[count]; //hack -- should be the actual bytes returned
 			if (count != xferLength) {
 				throw new Exception("Bad response payload: expected " + xferLength + "bytes, received " + charsRead + " bytes.");
 			}
-			
 		} catch (SocketTimeoutException e) {
 			System.out.println("Timed out");
 		} catch (Exception e) {
@@ -87,12 +77,11 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			}
 		}
 		
-		return response;
+		return buf.toString().getBytes();
+	//	return response;
 	}
 	
-	public TransferRateInterval DataXferRate(String header, String hostIP, int port, int timeout, int xferLength, int nTrials) {
-		System.out.println("DataXferRate called!");
-		
+	public TransferRateInterval DataXferRate(String header, String hostIP, int port, int timeout, int xferLength, int nTrials) {		
 		for(int i = 0; i < nTrials; i++) {
 			try {
 				TransferRate.start("DataXferRate");
@@ -108,7 +97,6 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 				TransferRate.abort("DataXferRate", xferLength);
 			}
 		}
-		
 		return TransferRate.get("DataXferRate");
 	}
 	

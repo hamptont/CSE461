@@ -49,6 +49,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	private boolean noDelay;
 	private int maxReadLength;
 	
+	private BufferedReader in;
+	
 	//--------------------------------------------------------------------------------------
 	// helper routines
 	//--------------------------------------------------------------------------------------
@@ -94,6 +96,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		this.timeout = 1000;
 		this.noDelay = true;
 		this.maxReadLength = 1000;
+		this.in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 	}
 	
 	/**
@@ -118,6 +121,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	public int setTimeout(int timeout) throws SocketException {
 		int old_timeout = this.timeout;
 		this.timeout = timeout;
+		this.socket.setSoTimeout(this.timeout);
 		return old_timeout;
 	}
 	
@@ -130,6 +134,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	public boolean setNoDelay(boolean value) throws SocketException {
 		boolean old_noDelay = this.noDelay;
 		this.noDelay = value;
+		this.socket.setTcpNoDelay(this.noDelay);
 		return old_noDelay;
 	}
 	
@@ -202,8 +207,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	@Override
 	public void sendMessage(JSONObject jsObject) throws IOException {
 		byte[] buf = jsObject.toString().getBytes("utf-8");
-		System.out.println("JSON: " + new String(buf));
-
 		sendMessage(buf);
 	}
 	
@@ -214,37 +217,25 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	
 	@Override
 	public byte[] readMessageAsBytes() throws IOException {
-	//	System.out.println("read message as bytes called");
-		//Read response
-		this.socket.setSoTimeout(this.timeout);
-		this.socket.setTcpNoDelay(this.noDelay);
-		BufferedReader in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
-
-		char[] response = new char[4];
-		
-		int chars_read = in.read(response, 0, 4);
-
-		byte[] responseLength = new byte[4];
+		//read header
+		int next;
+		byte[] length_byte = new byte[4];
 		for(int i = 0; i < 4; i++) {
-			responseLength[i] = (byte)response[i];
+			next = in.read();
+			length_byte[i] = new Integer(next).byteValue();
 		}
+		int length = byteToInt(length_byte);
 		
-		int length = byteToInt(responseLength);
-		
-		if(length == 0)
+		//read content
+		byte[] response = new byte[length];
+		int count = 0;
+		while((count < length) && ((next = in.read()) != -1))
 		{
-			length = this.maxReadLength;
+			byte b = new Integer(next).byteValue();
+			response[count] = b;
+			count++;
 		}
-
-		char[] char_header_response = new char[length];
-		chars_read = in.read(char_header_response, 0, length);
-		System.out.println("CHARS READ: " + chars_read);
-		byte[] header_response = new byte[length];
-		for(int i = 0; i < 4; i++) {
-			header_response[i] = (byte) char_header_response[i];
-		}
-
-		return header_response;
+		return response;
 	}
 	
 	@Override
