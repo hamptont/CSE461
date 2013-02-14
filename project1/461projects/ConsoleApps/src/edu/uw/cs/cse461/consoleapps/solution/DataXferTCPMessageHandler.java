@@ -43,7 +43,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			tcpMessageHandlerSocket.sendMessage(header);
 			
 			JSONObject json = new JSONObject();
-			json.put("transferSize", xferLength);
+			json.put("transferSize", new Integer(xferLength));
 			tcpMessageHandlerSocket.sendMessage(json);
 			
 			System.out.println("DONE SENDING Xfer");
@@ -60,13 +60,14 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			System.out.println("RESPONSE str: " + responseStr);
 			int charsRead = responseStr.length();
 			int count = charsRead;
-			while(charsRead > 0){
+			while(charsRead > 0 && count < xferLength){
 				responseStr = tcpMessageHandlerSocket.readMessageAsString();
 				charsRead = responseStr.length();
 				count += charsRead;
-				System.out.println("RESPONSE STR: " + responseStr);
-				System.out.println("count" + count);
+			//	System.out.println("RESPONSE STR: " + responseStr);
+			//	System.out.println("count" + count);
 			}
+			System.out.println("FINAL COUNT: " + count);
 			response = new byte[count]; //hack -- should be the actual bytes returned
 			if (count != xferLength) {
 				throw new Exception("Bad response payload: expected " + xferLength + "bytes, received " + charsRead + " bytes.");

@@ -77,9 +77,11 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	protected static int byteToInt(byte buf[]) {
 		//TODO You need to implement this.  It's the inverse of intToByte().
+	//	System.out.println("byteToInt INPUT: " + new String(buf));
 		ByteBuffer b = ByteBuffer.wrap(buf);
 		b.order(ByteOrder.LITTLE_ENDIAN);
-		return b.getInt();
+		int ans = b.getInt();
+		return ans;
 	}
 
 	/**
@@ -172,7 +174,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(String str) throws IOException {
-		byte[] buf = str.getBytes();
+		byte[] buf = str.getBytes("utf-8");
 		sendMessage(buf);
 	}
 
@@ -190,7 +192,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONArray jsArray) throws IOException {
-		byte[] buf = jsArray.toString().getBytes(); 
+		byte[] buf = jsArray.toString().getBytes("utf-8"); 
 		sendMessage(buf);
 	}
 	
@@ -199,7 +201,9 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONObject jsObject) throws IOException {
-		byte[] buf = jsObject.toString().getBytes();
+		byte[] buf = jsObject.toString().getBytes("utf-8");
+		System.out.println("JSON: " + new String(buf));
+
 		sendMessage(buf);
 	}
 	
@@ -210,6 +214,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	
 	@Override
 	public byte[] readMessageAsBytes() throws IOException {
+	//	System.out.println("read message as bytes called");
 		//Read response
 		this.socket.setSoTimeout(this.timeout);
 		this.socket.setTcpNoDelay(this.noDelay);
@@ -218,32 +223,24 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		char[] response = new char[4];
 		
 		int chars_read = in.read(response, 0, 4);
-		System.out.println("chars read: " + chars_read);
-
-		if(chars_read != 4) {
-			System.out.println("Did not read int: " + new String(response));
-		}
-		else 
-		{
-			System.out.println("Read int: " + new String(response));
-		}
 
 		byte[] responseLength = new byte[4];
 		for(int i = 0; i < 4; i++) {
 			responseLength[i] = (byte)response[i];
 		}
-
+		
 		int length = byteToInt(responseLength);
-		System.out.println("length: " + length);
+		
+		if(length == 0)
+		{
+			length = this.maxReadLength;
+		}
+
 		char[] char_header_response = new char[length];
 		chars_read = in.read(char_header_response, 0, length);
-		
-		if(chars_read != length) {
-			System.out.println("Did not read enough bytes");
-		}
-		
+		System.out.println("CHARS READ: " + chars_read);
 		byte[] header_response = new byte[length];
-		for(int i = 0; i < length; i++) {
+		for(int i = 0; i < 4; i++) {
 			header_response[i] = (byte) char_header_response[i];
 		}
 
