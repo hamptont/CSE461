@@ -224,10 +224,8 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		for(int i = 0; i < 4; i++) {
 			next = in.read();
 			length_byte[i] = new Integer(next).byteValue();
-			System.out.println(next);
 		}
 		int length = byteToInt(length_byte);
-		System.out.println("length: " + length);
 		
 		//read content
 		byte[] response = new byte[length];
