@@ -49,7 +49,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	private boolean noDelay;
 	private int maxReadLength;
 	
-	private BufferedReader in;
+	private InputStream in;
 	
 	//--------------------------------------------------------------------------------------
 	// helper routines
@@ -96,7 +96,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		this.timeout = 1000;
 		this.noDelay = true;
 		this.maxReadLength = 1000;
-		this.in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+		this.in = this.socket.getInputStream();
 	}
 	
 	/**
@@ -172,6 +172,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		
 		out.write(len);
 		out.write(buf);
+		out.flush();
 	}
 	
 	/**
@@ -179,7 +180,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(String str) throws IOException {
-		byte[] buf = str.getBytes("utf-8");
+		byte[] buf = str.getBytes("UTF-8");
 		sendMessage(buf);
 	}
 
@@ -197,7 +198,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONArray jsArray) throws IOException {
-		byte[] buf = jsArray.toString().getBytes("utf-8"); 
+		byte[] buf = jsArray.toString().getBytes("UTF-8"); 
 		sendMessage(buf);
 	}
 	
@@ -206,7 +207,7 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 */
 	@Override
 	public void sendMessage(JSONObject jsObject) throws IOException {
-		byte[] buf = jsObject.toString().getBytes("utf-8");
+		byte[] buf = jsObject.toString().getBytes("UTF-8");
 		sendMessage(buf);
 	}
 	
@@ -223,8 +224,10 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		for(int i = 0; i < 4; i++) {
 			next = in.read();
 			length_byte[i] = new Integer(next).byteValue();
+			System.out.println(next);
 		}
 		int length = byteToInt(length_byte);
+		System.out.println("length: " + length);
 		
 		//read content
 		byte[] response = new byte[length];
