@@ -102,9 +102,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 	
 	@Override
 	public void run() throws Exception {
-		//TODO PROJECT 2
 		try {
-
 			// Eclipse doesn't support System.console()
 			BufferedReader console = new BufferedReader(new InputStreamReader(System.in));
 
@@ -141,28 +139,24 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			String trialStr = console.readLine();
 			int nTrials = Integer.parseInt(trialStr);
 
-			for ( int index=0; index<DataXferRawService.NPORTS; index++ ) {
-
-				TransferRate.clear();
-				
-				int port = basePort + index;
-				//int xferLength = DataXferRawService.XFERSIZE[index];
-
-				System.out.println("\n" + xferLength + " bytes");
-
-
-				//-----------------------------------------------------
-				// TCP transfer
-				//-----------------------------------------------------
-
-				TransferRateInterval tcpStats = DataXferRate(DataXferServiceBase.HEADER_STR, server, port, socketTimeout, xferLength, nTrials);
-
-				System.out.println("\nTCP: xfer rate = " + String.format("%9.0f", tcpStats.mean() * 1000.0) + " bytes/sec.");
-				System.out.println("TCP: failure rate = " + String.format("%5.1f", tcpStats.failureRate()) +
-						           " [" + tcpStats.nAborted()+ "/" + tcpStats.nTrials() + "]");
-
-			}
+			TransferRate.clear();
 			
+			int port = basePort;
+
+			System.out.println("\n" + xferLength + " bytes");
+
+
+			//-----------------------------------------------------
+			// TCP transfer
+			//-----------------------------------------------------
+
+			TransferRateInterval tcpStats = DataXferRate("xfer", server, port, socketTimeout, xferLength, nTrials);
+
+			System.out.println("\nTCP: xfer rate = " + String.format("%9.0f", tcpStats.mean() * 1000.0) + " bytes/sec.");
+			System.out.println("TCP: failure rate = " + String.format("%5.1f", tcpStats.failureRate()) +
+					           " [" + tcpStats.nAborted()+ "/" + tcpStats.nTrials() + "]");
+
+	
 		} catch (Exception e) {
 			System.out.println("Unanticipated exception: " + e.getMessage());
 		}
