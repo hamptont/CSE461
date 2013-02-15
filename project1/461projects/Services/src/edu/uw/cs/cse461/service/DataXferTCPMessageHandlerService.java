@@ -1,6 +1,21 @@
 package edu.uw.cs.cse461.service;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+
+import org.json.JSONObject;
+
+import edu.uw.cs.cse461.net.base.NetBase;
 import edu.uw.cs.cse461.net.base.NetLoadableInterface.NetLoadableServiceInterface;
+import edu.uw.cs.cse461.net.tcpmessagehandler.TCPMessageHandler;
+import edu.uw.cs.cse461.util.ConfigManager;
+import edu.uw.cs.cse461.util.IPFinder;
 import edu.uw.cs.cse461.util.Log;
 
 public class DataXferTCPMessageHandlerService extends DataXferServiceBase implements NetLoadableServiceInterface {
@@ -8,8 +23,33 @@ public class DataXferTCPMessageHandlerService extends DataXferServiceBase implem
 	
 	protected DataXferTCPMessageHandlerService(String loadablename) throws Exception {
 		super("DataXferTCPMessageHandlerService");
+	
+		ConfigManager config = NetBase.theNetBase().config();
+		String serverIP = IPFinder.localIP();
+		int basePort = config.getAsInt("dataxferraw.server.baseport", 0);
+
+		ServerSocket server = new ServerSocket();
+		server.bind(new InetSocketAddress(serverIP, basePort));
+		server.setSoTimeout(NetBase.theNetBase().config().getAsInt("net.timeout.granularity", 500));
+	
+		Socket s = server.accept();
+		TCPMessageHandler socket = new TCPMessageHandler(s);
 		
-		//TODO Project 2
+		String headerstr = socket.readMessageAsString();
+		
+		if(!headerstr.equalsIgnoreCase("XFER")) {
+			throw new Exception("Bad header string. Expected: XFER, received: " + headerstr);
+		}
+		
+		JSONObject json = socket.readMessageAsJSONObject();
+		int xfer_size = (Integer) json.get("transferSize");
+		
+		while(xfer_size > 0) {
+			int msg_size = Math.min(xfer_size, socket.getMaxReadLength());
+			byte buf[] = new byte[msg_size];
+			socket.sendMessage(buf);
+			xfer_size -= msg_size;
+		}
 	}
 	
 	/**

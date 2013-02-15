@@ -1,30 +1,18 @@
 package edu.uw.cs.cse461.net.tcpmessagehandler;
 
-import java.io.BufferedReader;
-
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.CharBuffer;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import edu.uw.cs.cse461.net.base.NetBase;
-import edu.uw.cs.cse461.util.Log;
 
 
 /**
@@ -43,12 +31,10 @@ import edu.uw.cs.cse461.util.Log;
 public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	private static final String TAG="TCPMessageHandler";
 	
-	//Init in the constructor
 	private Socket socket; 
 	private int timeout;
 	private boolean noDelay;
 	private int maxReadLength;
-	
 	private InputStream in;
 	
 	//--------------------------------------------------------------------------------------
@@ -78,8 +64,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	 * @return 
 	 */
 	protected static int byteToInt(byte buf[]) {
-		//TODO You need to implement this.  It's the inverse of intToByte().
-	//	System.out.println("byteToInt INPUT: " + new String(buf));
 		ByteBuffer b = ByteBuffer.wrap(buf);
 		b.order(ByteOrder.LITTLE_ENDIAN);
 		int ans = b.getInt();
@@ -218,11 +202,15 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	
 	@Override
 	public byte[] readMessageAsBytes() throws IOException {
-		//read header
+		//read length header
 		int next;
 		byte[] length_byte = new byte[4];
 		for(int i = 0; i < 4; i++) {
 			next = in.read();
+			if(next == -1){
+				throw new IOException("Input stream only read " + (i + 1) + 
+						" bytes for msg length header. Expected 4 bytes");
+			}
 			length_byte[i] = new Integer(next).byteValue();
 		}
 		int length = byteToInt(length_byte);
@@ -255,14 +243,13 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 	public JSONArray readMessageAsJSONArray() throws IOException, JSONException {
 		byte[] buf = readMessageAsBytes();
 		String sourceStr = new String(buf);
-		
-		return new JSONArray(sourceStr); //TODO String to JSONArray
+		return new JSONArray(sourceStr); 
 	}
 	
 	@Override
 	public JSONObject readMessageAsJSONObject() throws IOException, JSONException {
 		byte[] buf = readMessageAsBytes();
 		String sourceStr = new String(buf);
-		return new JSONObject(sourceStr); // TODO String to JSONObject
+		return new JSONObject(sourceStr); 
 	}
 }
