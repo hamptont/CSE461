@@ -207,10 +207,6 @@ public class TCPMessageHandler implements TCPMessageHandlerInterface {
 		byte[] length_byte = new byte[4];
 		for(int i = 0; i < 4; i++) {
 			next = in.read();
-			if(next == -1){
-				throw new IOException("Input stream only read " + (i + 1) + 
-						" bytes for msg length header. Expected 4 bytes");
-			}
 			length_byte[i] = new Integer(next).byteValue();
 		}
 		int length = byteToInt(length_byte);
