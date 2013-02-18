@@ -100,8 +100,8 @@ public class DataXferRawService extends DataXferServiceBase implements NetLoadab
 		// Code/thread handling the UDP socket
 		Thread dgramThread = new Thread() {
 			public void run() {
-				byte buf[] = new byte[1000 + HEADER_STR.length()];
-				DatagramPacket packet = new DatagramPacket(buf, buf.length);
+				byte buf[] = null;
+				DatagramPacket packet = null;
 
 				//	Thread termination in this code is primitive.  When shutdown() is called (by the
 				//	application's main thread, so asynchronously to the threads just mentioned) it
@@ -110,42 +110,27 @@ public class DataXferRawService extends DataXferServiceBase implements NetLoadab
 				try {
 					while ( !mAmShutdown ) {
 						try {
+							buf = new byte[HEADER_STR.length()];
+							packet = new DatagramPacket(buf, buf.length);
+							
 							mDatagramSocket.get(i).receive(packet);
 							if ( packet.getLength() < HEADER_STR.length() )
 								throw new Exception("Bad header: length = " + packet.getLength());
 							String headerStr = new String( buf, 0, HEADER_STR.length() );
 							if ( ! headerStr.equalsIgnoreCase(HEADER_STR) )
 								throw new Exception("Bad header: got '" + headerStr + "', wanted '" + HEADER_STR + "'");
-				//****			
-							//Figure out how much data to send back
-							if((mBasePort % 100) >= XFERSIZE.length)
-							{
-								throw new Exception("Bad port number: " + mBasePort + ". Need a port number ending in 0, 1, 2 or 3.");
-							}
-							int response_length = XFERSIZE[mBasePort % 100];
+
+							int response_length = XFERSIZE[i];
 							
-							while(response_length > 0){
-								int bytes_to_send = Math.max(response_length, 1000);
+							while (response_length > 0) {
+								int bytes_to_send = Math.min(response_length, 1000);
 								response_length -= bytes_to_send;
-															
-								//header
+								buf = new byte[RESPONSE_OKAY_STR.length() + bytes_to_send];
 								System.arraycopy(RESPONSE_OKAY_STR.getBytes(), 0, buf, 0, HEADER_STR.length());
 								
-								//Fill up rest of buffer with data
-								for(int i = 0; i < bytes_to_send; i++)
-								{
-									buf[i + HEADER_STR.length()] = "A".getBytes()[0];
-									
-									//Check to see if we should add EOM
-									if((bytes_to_send == 0) && (i == (bytes_to_send - 1)))
-									{
-										buf[i + HEADER_STR.length()] = "\0".getBytes()[0];	
-									}
-								}
-								
-								mDatagramSocket.get(i).send( new DatagramPacket(buf, packet.getLength(), packet.getAddress(), packet.getPort()));
+								mDatagramSocket.get(i).send(new DatagramPacket(buf, buf.length, packet.getAddress(), packet.getPort()));
 							}
-				//*****
+							
 						} catch (SocketTimeoutException e) {
 							// socket timeout is normal
 						} catch (Exception e) {
@@ -194,30 +179,16 @@ public class DataXferRawService extends DataXferServiceBase implements NetLoadab
 							if ( !headerStr.equalsIgnoreCase(HEADER_STR) )
 								throw new Exception("Bad header: got '" + headerStr + "' but wanted '" + HEADER_STR + "'");
 							os.write(RESPONSE_OKAY_STR.getBytes());
-				//*****			
-							//Figure out how much data to send back
-							if((mBasePort % 100) >= XFERSIZE.length)
-							{
-								throw new Exception("Bad port number: " + mBasePort + ". Need a port number ending in 0, 1, 2 or 3.");
-							}
-							int response_length = XFERSIZE[mBasePort % 100];
+
+							int response_length = XFERSIZE[i];
 							
 							//Write back the data to the client
 							while(response_length > 0)
 							{
-								int bytes_to_send = Math.max(response_length, 1024);
+								int bytes_to_send = Math.min(response_length, 1024);
 								response_length -= bytes_to_send;
 								os.write(buf, 0, bytes_to_send);
 							}
-				//*****			
-							// Now read and echo the payload.
-							// Keep reading until the client has closed its side of the connection
-							/*
-							while ((len = is.read(buf)) >= 0) 
-							{
-								os.write(buf, 0, len);
-							}
-							*/
 							
 						} catch (SocketTimeoutException e) {
 							// normal behavior, but we're done with the client we were talking with
@@ -230,7 +201,7 @@ public class DataXferRawService extends DataXferServiceBase implements NetLoadab
 				} catch (Exception e) {
 					Log.w(TAG, "TCP server thread exiting due to exception: " + e.getMessage());
 				} finally {
-					if ( mServerSocket != null ) try { mServerSocket.get(i).close(); mServerSocket = null; } catch (Exception e) {}
+					if ( mServerSocket != null ) try { mServerSocket.get(i).close(); mServerSocket = null; } catch (Exception e) {};
 				}
 			}
 		};
