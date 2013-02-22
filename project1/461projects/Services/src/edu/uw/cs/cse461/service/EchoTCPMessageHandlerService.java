@@ -1,6 +1,7 @@
 package edu.uw.cs.cse461.service;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -81,6 +82,27 @@ public class EchoTCPMessageHandlerService extends EchoServiceBase  {
 		tcpThread.start();
 	}
 
+	/**
+	 * This method is called when the entire infrastructure
+	 * wants to terminate.  We set a flag indicating all threads
+	 * should terminate.  We then close the sockets.  The threads
+	 * using those sockets will either timeout and see the flag set or
+	 * else wake up on an IOException because the socket has been closed
+	 * and notice the flag is set.  Either way, they'll terminate.
+	 */
+	@Override
+	public void shutdown() {
+		super.shutdown();
+		if(mServerSocket != null) {
+			try {
+				mServerSocket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		Log.d(TAG, "Shutting down");
+	}
+	
 	@Override
 	public String dumpState() {
 		StringBuilder sb = new StringBuilder(super.dumpState());

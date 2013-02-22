@@ -67,6 +67,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			System.out.println("Timed out");
 		} catch (Exception e) {
 			System.out.println("TCPMessageHandler read failed: " + e.getMessage());
+			System.out.println(e.getStackTrace());
 		} finally {
 			if(tcpMessageHandlerSocket != null){
 				try{
@@ -116,6 +117,7 @@ public class DataXferTCPMessageHandler extends NetLoadableConsoleApp implements 
 			}
 
 			int basePort = config.getAsInt("dataxferraw.server.baseport", -1);
+			basePort += 10;
 			if ( basePort == -1 ) {
 				System.out.print("Enter port number, or empty line to exit: ");
 				String portStr = console.readLine();
