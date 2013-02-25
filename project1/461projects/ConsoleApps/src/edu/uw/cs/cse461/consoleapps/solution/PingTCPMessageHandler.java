@@ -77,7 +77,6 @@ public class PingTCPMessageHandler extends NetLoadableConsoleApp implements Ping
 				//Clean up socket
 				if (socket != null){
 					try {
-						System.out.println("CLOSE!!");
 						socket.close();
 					} catch (IOException e) {
 						e.printStackTrace();
