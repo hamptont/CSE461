@@ -1,6 +1,7 @@
 package edu.uw.cs.cse461.net.rpc;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.net.SocketException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,6 +14,7 @@ import org.json.JSONObject;
 
 import edu.uw.cs.cse461.net.base.NetBase;
 import edu.uw.cs.cse461.net.base.NetLoadable.NetLoadableService;
+import edu.uw.cs.cse461.net.tcpmessagehandler.TCPMessageHandler;
 import edu.uw.cs.cse461.util.Log;
 
 /**
@@ -114,7 +116,49 @@ public class RPCCall extends NetLoadableService {
 			int socketTimeout,        // max time to wait for reply
 			boolean tryAgain          // true if an invocation failure on a persistent connection should cause a re-try of the call, false to give up
 			) throws JSONException, IOException {
-		return null;
+		
+		//Set up TCPMessage Handler
+		Socket socket = new Socket(ip, port);
+		TCPMessageHandler handler = new TCPMessageHandler(socket);
+		
+		//Send connect RPC Message
+		JSONObject connectJSON = new RPCMessage().marshall();
+		connectJSON.put("action", "connect");
+		connectJSON.put("type", "control");
+		connectJSON.put("options", new JSONObject().put("connection", "keep-alive"));
+		
+		RPCMessage connect = RPCMessage.unmarshall(connectJSON.toString());
+		
+		handler.sendMessage(connect.marshall());
+		
+		//Read Response
+		JSONObject connectResponse = handler.readMessageAsJSONObject();
+		if(!connectResponse.get("type").equals("OK")) {
+		  //handle error
+		}
+		
+		//Invoke
+		JSONObject invokeJSON = new RPCMessage().marshall();
+		invokeJSON.put("app", serviceName);
+		invokeJSON.put("method", serviceName);
+		invokeJSON.put("args", userRequest);
+		invokeJSON.put("type", "invoke");
+		invokeJSON.put("options", new JSONObject().put("connection", "keep-alive"));
+		
+		RPCMessage invoke = RPCMessage.unmarshall(connectJSON.toString());
+		
+		handler.sendMessage(invoke.marshall());
+		
+		JSONObject invokeResponse = handler.readMessageAsJSONObject();
+		if(!connectResponse.get("type").equals("OK")) {
+		  //handle error
+		}
+		
+		//close connection
+		handler.close();
+		JSONObject returnValue = invokeResponse.getJSONObject("value");
+		
+		return returnValue;
 	}
 	
 	@Override
