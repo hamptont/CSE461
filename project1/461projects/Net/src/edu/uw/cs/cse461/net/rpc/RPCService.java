@@ -2,12 +2,15 @@ package edu.uw.cs.cse461.net.rpc;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.json.JSONObject;
 
@@ -20,6 +23,7 @@ import edu.uw.cs.cse461.net.rpc.RPCMessage.RPCResponseMessage;
 import edu.uw.cs.cse461.net.rpc.RPCMessage.RPCResponseMessage.RPCErrorResponseMessage;
 import edu.uw.cs.cse461.net.rpc.RPCMessage.RPCResponseMessage.RPCNormalResponseMessage;
 import edu.uw.cs.cse461.net.tcpmessagehandler.TCPMessageHandler;
+import edu.uw.cs.cse461.util.ConfigManager;
 import edu.uw.cs.cse461.util.IPFinder;
 import edu.uw.cs.cse461.util.Log;
 
@@ -32,6 +36,12 @@ import edu.uw.cs.cse461.util.Log;
 public class RPCService extends NetLoadableService implements Runnable, RPCServiceInterface {
 	private static final String TAG="RPCService";
 	
+	private ServerSocket server;
+	private int port;
+	
+	//Hashmap of serviceName to <hashmap of methodName to RPCCallableMethod>
+	private Map<String, Map<String, RPCCallableMethod>> handlers;
+	
 	/**
 	 * Constructor.  Creates the Java ServerSocket and binds it to a port.
 	 * If the config file specifies an rpc.server.port value, it should be bound to that port.
@@ -43,6 +53,28 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	public RPCService() throws Exception {
 		super("rpc");
+	
+		//init registered handlers hashmap
+		handlers = new HashMap<String, Map<String, RPCCallableMethod>>();
+		
+		//Get IP address
+		String serverIP = IPFinder.localIP();
+		if ( serverIP == null ){
+			throw new Exception("IPFinder isn't providing the local IP address.  Can't run.");
+		}
+		
+		//get port number from config file. Set as 0 if value not found
+		port = NetBase.theNetBase().config().getAsInt("rpc.server.port", 0);
+		
+		//create and bind socket
+		server = new ServerSocket();
+		InetSocketAddress addr = new InetSocketAddress(serverIP, port);
+		server.bind(addr);	
+		server.setSoTimeout(NetBase.theNetBase().config().getAsInt("net.timeout.granularity", 500));
+
+		//fork thread to accept connections
+		Thread t = new Thread(this);
+		t.start();
 	}
 	
 	/**
@@ -51,6 +83,15 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	@Override
 	public void run() {
+		while(true) {
+			try {
+				Socket connection = server.accept();
+				//TODO handle connection
+
+			} catch (Exception e) {
+				
+			}
+		}
 	}
 	
 	/**
@@ -63,6 +104,16 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	@Override
 	public synchronized void registerHandler(String serviceName, String methodName, RPCCallableMethod method) throws Exception {
+		Map<String, RPCCallableMethod> serviceMap = handlers.get(serviceName);
+		if(serviceMap == null) {
+			//first method for this serviceName
+			serviceMap = new HashMap<String, RPCCallableMethod>();
+			serviceMap.put(methodName, method);
+			handlers.put(serviceName, serviceMap);
+		} else {
+			//If the method already exists, it will override the existing RPCCallableMethod
+			serviceMap.put(methodName, method);
+		}
 	}
 	
 	/**
@@ -74,7 +125,11 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 * @return The existing registration for that method of that service, or null if no registration exists.
 	 */
 	public RPCCallableMethod getRegistrationFor( String serviceName, String methodName) {
-		return null;
+		Map<String, RPCCallableMethod> serviceMap = handlers.get(serviceName);
+		if(serviceMap == null) {
+			return null;
+		} 
+		return serviceMap.get(methodName);
 	}
 	
 	/**
@@ -83,7 +138,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	@Override
 	public int localPort() {
-		return 0;
+		return port;
 	}
 	
 	@Override
