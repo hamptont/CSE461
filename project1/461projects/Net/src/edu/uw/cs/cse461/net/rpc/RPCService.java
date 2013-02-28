@@ -1,5 +1,6 @@
 package edu.uw.cs.cse461.net.rpc;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
@@ -7,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,8 +38,7 @@ import edu.uw.cs.cse461.util.Log;
 public class RPCService extends NetLoadableService implements Runnable, RPCServiceInterface {
 	private static final String TAG="RPCService";
 	
-	private ServerSocket server;
-	private int port;
+	private ServerSocket mServerSocket;
 	
 	//Hashmap of serviceName to <hashmap of methodName to RPCCallableMethod>
 	private Map<String, Map<String, RPCCallableMethod>> handlers;
@@ -57,24 +58,17 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 		//init registered handlers hashmap
 		handlers = new HashMap<String, Map<String, RPCCallableMethod>>();
 		
-		//Get IP address
+		ConfigManager config = NetBase.theNetBase().config();
 		String serverIP = IPFinder.localIP();
-		if ( serverIP == null ){
-			throw new Exception("IPFinder isn't providing the local IP address.  Can't run.");
-		}
+		int basePort = 0; //config.getAsInt("dataxferraw.server.baseport", 0);
+		mServerSocket = new ServerSocket();
+		InetSocketAddress addr = new InetSocketAddress(serverIP, (basePort));
+		mServerSocket.bind(addr);
+		mServerSocket.setSoTimeout(NetBase.theNetBase().config().getAsInt("net.timeout.granularity", 500));
 		
-		//get port number from config file. Set as 0 if value not found
-		port = NetBase.theNetBase().config().getAsInt("rpc.server.port", 0);
+		Thread tcpThread = new Thread(this);
 		
-		//create and bind socket
-		server = new ServerSocket();
-		InetSocketAddress addr = new InetSocketAddress(serverIP, port);
-		server.bind(addr);	
-		server.setSoTimeout(NetBase.theNetBase().config().getAsInt("net.timeout.granularity", 500));
-
-		//fork thread to accept connections
-		Thread t = new Thread(this);
-		t.start();
+		tcpThread.start();
 	}
 	
 	/**
@@ -83,14 +77,90 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	@Override
 	public void run() {
-		while(true) {
-			try {
-				Socket connection = server.accept();
-				//TODO handle connection
+		try {
+			while (!mAmShutdown) {
+				Socket socket = null;
+				try {
+					socket = mServerSocket.accept();
+					
+					TCPMessageHandler handler = null;
+					try {
+						handler = new TCPMessageHandler(socket);
+		
+						//Connect
+						JSONObject connectJSON = handler.readMessageAsJSONObject();
+						if (!connectJSON.get("action").equals("connect")) {
+							//failed connect
+							
+							//TODO:get rid of print
+							System.out.println("failed");
+						}
+						//TODO: get rid of print
+						System.out.println("received connect message");
+						
+						
+						JSONObject responseJSON = new RPCMessage().marshall();
+						responseJSON.put("type", "OK");
+						responseJSON.put("callid", connectJSON.getInt("id"));
+						
+						RPCMessage response = RPCMessage.unmarshall(responseJSON.toString());
+						//TODO: get rid of print
+						System.out.println("response: " + response);
 
-			} catch (Exception e) {
-				
+						handler.sendMessage(response.marshall());
+						
+						//TODO: get rid of print
+						System.out.println("sent response");
+						
+						//invoke
+						JSONObject invokeJSON = handler.readMessageAsJSONObject();
+						if (!invokeJSON.get("type").equals("invoke")) {
+							//failed connect
+							//TODO: get rid of print
+							System.out.println("failed invoke: " + invokeJSON);
+						}
+						
+						RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
+						//TODO: get rid of print
+						System.out.println("failed invoke: " + method);
+						
+						JSONObject returnJSON = method.handleCall(invokeJSON.getJSONObject("args"));
+						
+						//TODO: get rid of print
+						System.out.println("returnJSON: " + returnJSON);
+						
+						responseJSON = new RPCMessage().marshall();
+						responseJSON.put("type", "OK");
+						responseJSON.put("value", returnJSON);
+						responseJSON.put("callid", invokeJSON.getInt("id"));
+
+
+						response = RPCMessage.unmarshall(responseJSON.toString());
+
+						handler.sendMessage(response.marshall());
+						
+						
+					} catch (SocketTimeoutException e) {
+						Log.e(TAG, "Timed out waiting for data on tcp connection");
+					} catch (EOFException e) {
+						// normal termination of loop
+						Log.d(TAG, "EOF on tcpMessageHandlerSocket.readMessageAsString()");
+					} catch (Exception e) {
+						Log.i(TAG, "Unexpected exception while handling connection: " + e.getMessage());
+					} finally {
+						if ( handler != null ) try { handler.close(); } catch (Exception e) {}
+					}
+				} catch (SocketTimeoutException e) {
+					// this is normal.  Just loop back and see if we're terminating.
+				}
 			}
+		} catch (Exception e) {
+			Log.w(TAG, "Server thread exiting due to exception: " + e.getMessage());
+			System.out.println(e.getMessage());
+		} finally {
+			//System.out.println("CLOSE!");
+			if ( mServerSocket != null )  try { mServerSocket.close(); } catch (Exception e) {}
+			mServerSocket = null;
 		}
 	}
 	
@@ -138,11 +208,11 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 	 */
 	@Override
 	public int localPort() {
-		return port;
+		return mServerSocket.getLocalPort();
 	}
 	
 	@Override
 	public String dumpState() {
-		return "";
+		return "baseport: " + localPort();
 	}
 }
