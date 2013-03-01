@@ -131,25 +131,17 @@ public class RPCCall extends NetLoadableService {
 		
 		handler.sendMessage(connect.marshall());
 		
-		//TODO: get rid of print
-		System.out.println("sent connect");
 		
 		//Read Response
 		JSONObject connectResponse = handler.readMessageAsJSONObject();
 		if(!connectResponse.get("type").equals("OK")) {
 		  //handle error
-		  
-			//TODO: get rid of print
-			System.out.println("failed OK not read");
 		}
-		
-		//TODO: get rid of print
-		System.out.println("received response");
 		
 		//Invoke
 		JSONObject invokeJSON = new RPCMessage().marshall();
 		invokeJSON.put("app", serviceName);
-		invokeJSON.put("method", serviceName);
+		invokeJSON.put("method", method);
 		invokeJSON.put("args", userRequest);
 		invokeJSON.put("type", "invoke");
 		

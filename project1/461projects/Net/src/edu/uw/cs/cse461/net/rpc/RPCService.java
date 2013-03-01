@@ -92,11 +92,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 						if (!connectJSON.get("action").equals("connect")) {
 							//failed connect
 							
-							//TODO:get rid of print
-							System.out.println("failed");
 						}
-						//TODO: get rid of print
-						System.out.println("received connect message");
 						
 						
 						JSONObject responseJSON = new RPCMessage().marshall();
@@ -104,30 +100,19 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 						responseJSON.put("callid", connectJSON.getInt("id"));
 						
 						RPCMessage response = RPCMessage.unmarshall(responseJSON.toString());
-						//TODO: get rid of print
-						System.out.println("response: " + response);
 
 						handler.sendMessage(response.marshall());
 						
-						//TODO: get rid of print
-						System.out.println("sent response");
-						
 						//invoke
 						JSONObject invokeJSON = handler.readMessageAsJSONObject();
-						if (!invokeJSON.get("type").equals("invoke")) {
+						String type = invokeJSON.getString("type");
+						if (!type.equals("invoke")) {
 							//failed connect
-							//TODO: get rid of print
-							System.out.println("failed invoke: " + invokeJSON);
 						}
 						
 						RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
-						//TODO: get rid of print
-						System.out.println("failed invoke: " + method);
 						
 						JSONObject returnJSON = method.handleCall(invokeJSON.getJSONObject("args"));
-						
-						//TODO: get rid of print
-						System.out.println("returnJSON: " + returnJSON);
 						
 						responseJSON = new RPCMessage().marshall();
 						responseJSON.put("type", "OK");
@@ -158,7 +143,6 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 			Log.w(TAG, "Server thread exiting due to exception: " + e.getMessage());
 			System.out.println(e.getMessage());
 		} finally {
-			//System.out.println("CLOSE!");
 			if ( mServerSocket != null )  try { mServerSocket.close(); } catch (Exception e) {}
 			mServerSocket = null;
 		}
@@ -183,6 +167,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 		} else {
 			//If the method already exists, it will override the existing RPCCallableMethod
 			serviceMap.put(methodName, method);
+			//handlers.put(serviceName, serviceMap);
 		}
 	}
 	
