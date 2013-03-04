@@ -135,8 +135,10 @@ public class PingRPC extends NetLoadableConsoleApp implements PingRPCInterface {
 				abortTimer = true;
 			}
 			if(abortTimer) {
+				//Failure
 				ElapsedTime.abort("PingRPC");
 			} else {
+				//Success
 				ElapsedTime.stop("PingRPC");
 			}
 		}
