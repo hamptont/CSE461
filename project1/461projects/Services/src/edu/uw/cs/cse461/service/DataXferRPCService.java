@@ -17,7 +17,9 @@ public class DataXferRPCService extends DataXferServiceBase {
 	 */
 	public static final String HEADER_KEY = "header";
 	public static final String HEADER_TAG_KEY = "tag";
-
+	public static final String HEADER_TAG = "xfer";
+	public static final String XFER_LEN = "xferLength";
+	
 	/**
 	 * Key used for EchoRPC's payload, in the args of an RPC call
 	 */
