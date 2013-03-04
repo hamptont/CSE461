@@ -25,10 +25,12 @@ import edu.uw.cs.cse461.net.rpc.RPCCall;
 import edu.uw.cs.cse461.service.DataXferRPCService;
 import edu.uw.cs.cse461.service.EchoRPCService;
 import edu.uw.cs.cse461.service.EchoServiceBase;
+import edu.uw.cs.cse461.util.Base64;
 import edu.uw.cs.cse461.util.ConfigManager;
 import edu.uw.cs.cse461.util.Log;
 import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTime;
 import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTimeInterval;
+import edu.uw.cs.cse461.util.SampledStatistic.TransferRate;
 import edu.uw.cs.cse461.util.SampledStatistic.TransferRateInterval;
 
 
@@ -105,17 +107,47 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 
 	@Override
 	public TransferRateInterval DataXferRate(JSONObject header, String hostIP, int port, int timeout, int nTrials) {
-		System.out.println("TransferRateInterval called!");
+		int xferLength;
+		try {
+			xferLength = header.getInt("xferLength");
+		} catch (JSONException e1) {
+			xferLength = 0; //bad header, not sure how to handle this case
+		}
+		for(int i = 0; i < nTrials; i++) {
+			boolean abortTimer = false;
+			try {
+				TransferRate.start("DataXferRPC");
+				byte[] response = DataXfer(header, hostIP, port, timeout);
+				if(response.length != xferLength) {
+					abortTimer = true;
+				}
+			} catch (JSONException e) {
+				abortTimer = true;
+			} catch (IOException e) {
+				abortTimer = true;
+			} finally {
+				if(!abortTimer) {
+					TransferRate.stop("DataXferRPC", xferLength);
+				} else {
+					TransferRate.abort("DataXferRPC", xferLength);
+				}
+			}
+		}
 		
-		return null;
+		return TransferRate.get("DataXferRPC");
 	}	
 	
 	@Override
 	public byte[] DataXfer(JSONObject header, String hostIP, int port, int timeout) throws JSONException, IOException {
-		System.out.println("DataXfer called!");
-
-		return null;
+		JSONObject args = new JSONObject();
+		args.put(DataXferRPCService.HEADER_KEY, header);
+		
+		JSONObject response = RPCCall.invoke(hostIP, port, "dataxferrpc", "dataxfer", args, timeout);
+		
+		byte[] response_bytes = Base64.decode(response.getString("data"));
+				
+		//TODO check for valid header
+		
+		return response_bytes;
 	}
-
-
 }
