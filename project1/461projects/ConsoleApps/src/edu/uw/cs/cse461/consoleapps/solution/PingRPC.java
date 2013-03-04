@@ -104,45 +104,40 @@ public class PingRPC extends NetLoadableConsoleApp implements PingRPCInterface {
 	@Override
 	public ElapsedTimeInterval ping(JSONObject header, String hostIP, int port, int timeout, int nTrials) throws Exception {
 		for(int i = 0; i < nTrials; i++) {
-			ElapsedTime.start("PingRPC");
-
-			JSONObject args = new JSONObject();
-			args.put(EchoRPCService.HEADER_KEY, header);
-			args.put(EchoRPCService.PAYLOAD_KEY, "");
-			
-			JSONObject response = RPCCall.invoke(hostIP, port, "echorpc", "echo", args, timeout);
-			if(response == null) {
-				throw new IOException("RPC failed; response is null");
-			}
-			
-			//Check valid header returned
-			boolean badHeader = false;
-			JSONObject rcvdHeader = response.optJSONObject(EchoRPCService.HEADER_KEY);
-			if (rcvdHeader == null || !rcvdHeader.has(EchoRPCService.HEADER_TAG_KEY)|| 
-					!rcvdHeader.getString(EchoRPCService.HEADER_TAG_KEY).equalsIgnoreCase(EchoServiceBase.RESPONSE_OKAY_STR)) {
+			boolean abortTimer = false;
+			try {
+				ElapsedTime.start("PingRPC");
+	
+				JSONObject args = new JSONObject();
+				args.put(EchoRPCService.HEADER_KEY, header);
+				args.put(EchoRPCService.PAYLOAD_KEY, "");
 				
-				ElapsedTime.abort("PingRPC");
-				badHeader = true;
-				/*
-				throw new IOException("Bad response header: got '" + rcvdHeader.toString() +
-						               "' but wanted a JSONOBject with key '" + EchoRPCService.HEADER_TAG_KEY + "' and string value '" +
-						               	EchoServiceBase.RESPONSE_OKAY_STR + "'");
-				*/
-			}
-			
-			//Check for valid payload (should be "")
-			if ((!badHeader) && (response.has(EchoRPCService.PAYLOAD_KEY))) {
-				String payload = response.getString(EchoRPCService.PAYLOAD_KEY);
-				if(payload.equals("")) {
-					//SUCCESS!
-					ElapsedTime.stop("PingRPC");
-				}else {
-					//Incorrect payload returned
-					ElapsedTime.abort("PingRPC");
+				JSONObject response = RPCCall.invoke(hostIP, port, "echorpc", "echo", args, timeout);
+				
+				if(response == null) {
+					System.out.println("NULL RESPONSE");
+					abortTimer = true;
 				}
-			} else {
-				//No payload returned
+
+				//Check for valid header (should be 'OKAY')
+				String header_response = response.getString(EchoRPCService.HEADER_KEY);
+				if(!header_response.equalsIgnoreCase(EchoRPCService.RESPONSE_OKAY_STR)) {
+					abortTimer  = true;
+				}
+				
+				//Check for valid payload (should be "")
+				String payload_reponse = response.getString(EchoRPCService.PAYLOAD_KEY);
+				if(!payload_reponse.equalsIgnoreCase("")) {
+					abortTimer  = true;
+				}
+				
+			} catch (Exception e) {
+				abortTimer = true;
+			}
+			if(abortTimer) {
 				ElapsedTime.abort("PingRPC");
+			} else {
+				ElapsedTime.stop("PingRPC");
 			}
 		}
 		return ElapsedTime.get("PingRPC");
