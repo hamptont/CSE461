@@ -112,6 +112,7 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 			xferLength = header.getInt("xferLength");
 		} catch (JSONException e1) {
 			xferLength = 0; //bad header, not sure how to handle this case
+			return null; //???
 		}
 		for(int i = 0; i < nTrials; i++) {
 			boolean abortTimer = false;
