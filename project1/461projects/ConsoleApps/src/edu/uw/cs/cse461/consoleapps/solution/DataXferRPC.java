@@ -1,35 +1,20 @@
 package edu.uw.cs.cse461.consoleapps.solution;
 
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import edu.uw.cs.cse461.consoleapps.DataXferInterface.DataXferRPCInterface;
-import edu.uw.cs.cse461.consoleapps.PingInterface.PingRPCInterface;
-import edu.uw.cs.cse461.consoleapps.PingInterface.PingRawInterface;
 import edu.uw.cs.cse461.net.base.NetBase;
 import edu.uw.cs.cse461.net.base.NetLoadable.NetLoadableConsoleApp;
 import edu.uw.cs.cse461.net.rpc.RPCCall;
 import edu.uw.cs.cse461.service.DataXferRPCService;
-import edu.uw.cs.cse461.service.EchoRPCService;
-import edu.uw.cs.cse461.service.EchoServiceBase;
 import edu.uw.cs.cse461.util.Base64;
 import edu.uw.cs.cse461.util.ConfigManager;
-import edu.uw.cs.cse461.util.Log;
 import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTime;
-import edu.uw.cs.cse461.util.SampledStatistic.ElapsedTimeInterval;
 import edu.uw.cs.cse461.util.SampledStatistic.TransferRate;
 import edu.uw.cs.cse461.util.SampledStatistic.TransferRateInterval;
 
@@ -74,6 +59,11 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 				String trialStr = console.readLine();
 				int nTrials = Integer.parseInt(trialStr);
 
+				//Get number of bytes to send
+				System.out.print("Enter number of bytes to transfer: ");
+				String byteStr = console.readLine();
+				int xferLength = Integer.parseInt(byteStr);
+				
 				//Get timeout 
 				int socketTimeout = config.getAsInt("net.timeout.socket", 5000);
 				
@@ -86,7 +76,6 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 				//Run xfer tests
 				if(port != 0) {
 					JSONObject header = new JSONObject();
-					int xferLength = 1000; //TODO
 					header.put(DataXferRPCService.HEADER_TAG_KEY, DataXferRPCService.HEADER_TAG);
 					header.put(DataXferRPCService.XFER_LEN, xferLength);
 					ElapsedTime.clear();
@@ -98,7 +87,7 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 					System.out.println("DataXferRPC: " + String.format("%.2f msec (%d failures)", result.mean(), result.nAborted()));
 				}
 			} catch (Exception e) {
-				System.out.println("Exception: " + e.getMessage());
+				System.out.println("Exception caught: " + e.getMessage());
 			} 
 		} catch (Exception e) {
 			System.out.println("DataXferRPC.run() caught exception: " + e.getMessage());
@@ -109,10 +98,9 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 	public TransferRateInterval DataXferRate(JSONObject header, String hostIP, int port, int timeout, int nTrials) {
 		int xferLength;
 		try {
-			xferLength = header.getInt("xferLength");
+			xferLength = header.getInt(DataXferRPCService.XFER_LEN);
 		} catch (JSONException e1) {
-			xferLength = 0; //bad header, not sure how to handle this case
-			return null; //???
+			xferLength = 0; //bad header -- unknown xferLength
 		}
 		for(int i = 0; i < nTrials; i++) {
 			boolean abortTimer = false;
@@ -134,7 +122,6 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 				}
 			}
 		}
-		
 		return TransferRate.get("DataXferRPC");
 	}	
 	
@@ -143,12 +130,10 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 		JSONObject args = new JSONObject();
 		args.put(DataXferRPCService.HEADER_KEY, header);
 		
-		JSONObject response = RPCCall.invoke(hostIP, port, "dataxferrpc", "dataxfer", args, timeout);
+		JSONObject response = RPCCall.invoke(hostIP, port, "dataxferrpc", "xfer", args, timeout);
 		
-		byte[] response_bytes = Base64.decode(response.getString("data"));
-				
-		//TODO check for valid header
-		
+		byte[] response_bytes = Base64.decode(response.getString(DataXferRPCService.HEADER_DATA));
+
 		return response_bytes;
 	}
 }
