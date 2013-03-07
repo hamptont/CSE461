@@ -100,6 +100,7 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 		try {
 			xferLength = header.getInt(DataXferRPCService.XFER_LEN);
 		} catch (JSONException e1) {
+			System.out.println("bad header");
 			xferLength = 0; //bad header -- unknown xferLength
 		}
 		for(int i = 0; i < nTrials; i++) {
@@ -130,8 +131,8 @@ public class DataXferRPC extends NetLoadableConsoleApp implements DataXferRPCInt
 		JSONObject args = new JSONObject();
 		args.put(DataXferRPCService.HEADER_KEY, header);
 		
-		JSONObject response = RPCCall.invoke(hostIP, port, "dataxferrpc", "xfer", args, timeout);
-		
+		JSONObject response = RPCCall.invoke(hostIP, port, "dataxferrpc", "dataxfer", args, timeout);
+
 		byte[] response_bytes = Base64.decode(response.getString(DataXferRPCService.HEADER_DATA));
 
 		return response_bytes;

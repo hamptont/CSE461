@@ -41,7 +41,7 @@ public class DataXferRPCService extends DataXferServiceBase {
 		// Set up the method descriptor variable to refer to this->_echo()
 		xfer = new RPCCallableMethod(this, "_xfer");
 		// Register the method with the RPC service as externally invocable method "echo"
-		((RPCService)NetBase.theNetBase().getService("rpc")).registerHandler(loadablename(), "xfer", xfer );
+		((RPCService)NetBase.theNetBase().getService("rpc")).registerHandler(loadablename(), "dataxfer", xfer );
 	}
 	
 	/**
@@ -78,6 +78,7 @@ public class DataXferRPCService extends DataXferServiceBase {
 		JSONObject json_response = new JSONObject();
 		json_response.put(HEADER_KEY, header_json);
 		json_response.put(HEADER_DATA, Base64.encodeBytes(raw_bytes));
+		
 		return json_response; 
 	}
 }
