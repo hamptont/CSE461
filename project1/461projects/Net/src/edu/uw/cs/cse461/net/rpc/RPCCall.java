@@ -3,9 +3,11 @@ package edu.uw.cs.cse461.net.rpc;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -33,6 +35,8 @@ import edu.uw.cs.cse461.util.Log;
  */
 public class RPCCall extends NetLoadableService {
 	private static final String TAG="RPCCall";
+	
+	private static Map<String, TCPMessageHandler> persistentConnections =  new HashMap<String, TCPMessageHandler>();
 
 	//-------------------------------------------------------------------------------------------
 	//-------------------------------------------------------------------------------------------
@@ -117,54 +121,74 @@ public class RPCCall extends NetLoadableService {
 			boolean tryAgain          // true if an invocation failure on a persistent connection should cause a re-try of the call, false to give up
 			) throws JSONException, IOException {
 		
-		//Set up TCPMessage Handler
-		Socket socket = new Socket(ip, port);
-		TCPMessageHandler handler = new TCPMessageHandler(socket);
-		
-		//Send connect RPC Message
-		JSONObject connectJSON = new RPCMessage().marshall();
-		connectJSON.put("action", "connect");
-		connectJSON.put("type", "control");
-		connectJSON.put("options", new JSONObject().put("connection", "keep-alive"));
-		
-		RPCMessage connect = RPCMessage.unmarshall(connectJSON.toString());
-		
-		handler.sendMessage(connect.marshall());
-		
-		
-		//Read Response
-		JSONObject connectResponse = handler.readMessageAsJSONObject();
-		if(!connectResponse.get("type").equals("OK")) {
-		  //handle error
-		  throw new IOException("Error Response");
+		TCPMessageHandler handler = null;
+		JSONObject returnValue = null;
+		try {
+			if (persistentConnections.containsKey(ip+port+serviceName+method)) {
+				handler = persistentConnections.get(ip+port+serviceName+method);
+			} else {
+				//Set up TCPMessage Handler
+				Socket socket = new Socket(ip, port);
+				handler = new TCPMessageHandler(socket);
+				
+				//Send connect RPC Message
+				JSONObject connectJSON = new RPCMessage().marshall();
+				connectJSON.put("action", "connect");
+				connectJSON.put("type", "control");
+				connectJSON.put("options", new JSONObject().put("connection", "keep-alive"));
+								
+				RPCMessage connect = RPCMessage.unmarshall(connectJSON.toString());
+				
+				handler.sendMessage(connect.marshall());
+				
+				
+				//Read Response
+				JSONObject connectResponse = handler.readMessageAsJSONObject();
+				if(!connectResponse.get("type").equals("OK")) {
+				  //handle error
+				  throw new IOException("Error Response");
+				}
+				
+				persistentConnections.put(ip+port+serviceName+method, handler);
+				socket.setSoTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout", 10000));
+			}
+			
+			//Invoke
+			JSONObject invokeJSON = new RPCMessage().marshall();
+			invokeJSON.put("app", serviceName);
+			invokeJSON.put("method", method);
+			invokeJSON.put("args", userRequest);
+			invokeJSON.put("type", "invoke");
+			
+			RPCMessage invoke = RPCMessage.unmarshall(invokeJSON.toString());
+			
+			handler.sendMessage(invoke.marshall());
+			
+			JSONObject invokeResponse = handler.readMessageAsJSONObject();
+			if(!invokeResponse.get("type").equals("OK")) {
+			  //handle error
+			  throw new IOException("Error Response");
+			}
+			
+			returnValue = invokeResponse.getJSONObject("value");
+		} catch (SocketException e){
+			persistentConnections.remove(ip+port+serviceName+method);
+			handler.close();
+
+			if(tryAgain) {
+				returnValue = _invoke(ip, port, serviceName, method, userRequest, socketTimeout, false);
+			}
 		}
-		
-		//Invoke
-		JSONObject invokeJSON = new RPCMessage().marshall();
-		invokeJSON.put("app", serviceName);
-		invokeJSON.put("method", method);
-		invokeJSON.put("args", userRequest);
-		invokeJSON.put("type", "invoke");
-		
-		RPCMessage invoke = RPCMessage.unmarshall(invokeJSON.toString());
-		
-		handler.sendMessage(invoke.marshall());
-		
-		JSONObject invokeResponse = handler.readMessageAsJSONObject();
-		if(!invokeResponse.get("type").equals("OK")) {
-		  //handle error
-		  throw new IOException("Error Response");
-		}
-		
-		//close connection
-		handler.close();
-		JSONObject returnValue = invokeResponse.getJSONObject("value");
 		
 		return returnValue;
 	}
 	
 	@Override
 	public void shutdown() {
+		for(TCPMessageHandler handler : persistentConnections.values()) {
+			handler.close();
+		}
+		persistentConnections = null;
 	}
 	
 	@Override

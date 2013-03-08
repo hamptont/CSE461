@@ -67,7 +67,6 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 		mServerSocket.setSoTimeout(NetBase.theNetBase().config().getAsInt("net.timeout.granularity", 500));
 		
 		Thread tcpThread = new Thread(this);
-		
 		tcpThread.start();
 	}
 	
@@ -94,7 +93,6 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 							throw new Exception("Connect message not received");
 						}
 						
-						
 						JSONObject responseJSON = new RPCMessage().marshall();
 						responseJSON.put("type", "OK");
 						responseJSON.put("callid", connectJSON.getInt("id"));
@@ -102,6 +100,11 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 						RPCMessage response = RPCMessage.unmarshall(responseJSON.toString());
 
 						handler.sendMessage(response.marshall());
+						
+						//socket.setSoTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout", 10000));
+						
+						//Thread tcpThread = new Thread(this);
+						//tcpThread.start();
 						
 						//invoke
 						JSONObject invokeJSON = handler.readMessageAsJSONObject();
