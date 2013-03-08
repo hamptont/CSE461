@@ -200,7 +200,14 @@ public class RPCCall extends NetLoadableService {
 	
 	@Override
 	public String dumpState() {
-		return "Current persistent connections are ...";
+		//	private static Map<String, TCPMessageHandler> persistentConnections =  new HashMap<String, TCPMessageHandler>();
+		String state = "Current persistent connections are ...\n";
+		for(String s : persistentConnections.keySet()) {
+			TCPMessageHandler handler = persistentConnections.get(s);
+			state += s + " : " + handler.toString() + "\n";
+		}
+		
+		return state;
 	}
 	
 	public static void setWantPersistent(boolean persistence) {
