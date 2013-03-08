@@ -85,6 +85,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 					TCPMessageHandler handler = null;
 					try {
 						handler = new TCPMessageHandler(socket);
+						boolean wantPersistent = false;
 		
 						//Connect
 						JSONObject connectJSON = handler.readMessageAsJSONObject();
@@ -92,43 +93,73 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 							//failed connect
 							throw new Exception("Connect message not received");
 						}
+						if(connectJSON.has("options")) {
+							JSONObject option = connectJSON.getJSONObject("options");
+							if(option.has("connection") && option.getString("connection").equals("keep-alive")) {
+								wantPersistent = true;
+							}
+						}
 						
 						JSONObject responseJSON = new RPCMessage().marshall();
 						responseJSON.put("type", "OK");
 						responseJSON.put("callid", connectJSON.getInt("id"));
+						responseJSON.put("value", new JSONObject().put("connection", "keep-alive"));
 						
 						RPCMessage response = RPCMessage.unmarshall(responseJSON.toString());
 
 						handler.sendMessage(response.marshall());
 						
-						//socket.setSoTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout", 10000));
-						
-						//Thread tcpThread = new Thread(this);
-						//tcpThread.start();
-						
-						//invoke
-						JSONObject invokeJSON = handler.readMessageAsJSONObject();
-						String type = invokeJSON.getString("type");
-						if (!type.equals("invoke")) {
-							//failed connect
-							throw new Exception("Invoke message not received");
+						if(wantPersistent) {
+							Thread tcpThread = new Thread(this);
+							tcpThread.start();
+							
+							handler.setTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout"));
+							
+							//invoke
+							while (true) {
+								JSONObject invokeJSON = handler.readMessageAsJSONObject();
+								String type = invokeJSON.getString("type");
+								if (!type.equals("invoke")) {
+									//failed connect
+									throw new Exception("Invoke message not received");
+								}
+								
+								RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
+								
+								JSONObject returnJSON = method.handleCall(invokeJSON.getJSONObject("args"));
+								
+								responseJSON = new RPCMessage().marshall();
+								responseJSON.put("type", "OK");
+								responseJSON.put("value", returnJSON);
+								responseJSON.put("callid", invokeJSON.getInt("id"));
+		
+		
+								response = RPCMessage.unmarshall(responseJSON.toString());
+		
+								handler.sendMessage(response.marshall());	
+							}
+						} else {
+							JSONObject invokeJSON = handler.readMessageAsJSONObject();
+							String type = invokeJSON.getString("type");
+							if (!type.equals("invoke")) {
+								//failed connect
+								throw new Exception("Invoke message not received");
+							}
+							
+							RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
+							
+							JSONObject returnJSON = method.handleCall(invokeJSON.getJSONObject("args"));
+							
+							responseJSON = new RPCMessage().marshall();
+							responseJSON.put("type", "OK");
+							responseJSON.put("value", returnJSON);
+							responseJSON.put("callid", invokeJSON.getInt("id"));
+	
+	
+							response = RPCMessage.unmarshall(responseJSON.toString());
+	
+							handler.sendMessage(response.marshall());	
 						}
-						
-						RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
-						
-						JSONObject returnJSON = method.handleCall(invokeJSON.getJSONObject("args"));
-						
-						responseJSON = new RPCMessage().marshall();
-						responseJSON.put("type", "OK");
-						responseJSON.put("value", returnJSON);
-						responseJSON.put("callid", invokeJSON.getInt("id"));
-
-
-						response = RPCMessage.unmarshall(responseJSON.toString());
-
-						handler.sendMessage(response.marshall());
-						
-						
 					} catch (SocketTimeoutException e) {
 						Log.e(TAG, "Timed out waiting for data on tcp connection");
 					} catch (EOFException e) {

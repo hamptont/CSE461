@@ -37,6 +37,7 @@ public class RPCCall extends NetLoadableService {
 	private static final String TAG="RPCCall";
 	
 	private static Map<String, TCPMessageHandler> persistentConnections =  new HashMap<String, TCPMessageHandler>();
+	private static boolean wantPersistent = false;
 
 	//-------------------------------------------------------------------------------------------
 	//-------------------------------------------------------------------------------------------
@@ -134,8 +135,10 @@ public class RPCCall extends NetLoadableService {
 				//Send connect RPC Message
 				JSONObject connectJSON = new RPCMessage().marshall();
 				connectJSON.put("action", "connect");
-				connectJSON.put("type", "control");
-				connectJSON.put("options", new JSONObject().put("connection", "keep-alive"));
+				connectJSON.put("type", "control");	
+				if(wantPersistent) {
+					connectJSON.put("options", new JSONObject().put("connection", "keep-alive"));
+				}
 								
 				RPCMessage connect = RPCMessage.unmarshall(connectJSON.toString());
 				
@@ -149,8 +152,10 @@ public class RPCCall extends NetLoadableService {
 				  throw new IOException("Error Response");
 				}
 				
-				persistentConnections.put(ip+port+serviceName+method, handler);
-				socket.setSoTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout", 10000));
+				if(wantPersistent) {
+					persistentConnections.put(ip+port+serviceName+method, handler);
+					handler.setTimeout(NetBase.theNetBase().config().getAsInt("rpc.persistence.timeout", 10000));
+				}
 			}
 			
 			//Invoke
@@ -172,11 +177,13 @@ public class RPCCall extends NetLoadableService {
 			
 			returnValue = invokeResponse.getJSONObject("value");
 		} catch (SocketException e){
-			persistentConnections.remove(ip+port+serviceName+method);
-			handler.close();
-
-			if(tryAgain) {
-				returnValue = _invoke(ip, port, serviceName, method, userRequest, socketTimeout, false);
+			if(wantPersistent) {
+				persistentConnections.remove(ip+port+serviceName+method);
+				handler.close();
+	
+				if(tryAgain) {
+					returnValue = _invoke(ip, port, serviceName, method, userRequest, socketTimeout, false);
+				}
 			}
 		}
 		
@@ -194,5 +201,9 @@ public class RPCCall extends NetLoadableService {
 	@Override
 	public String dumpState() {
 		return "Current persistent connections are ...";
+	}
+	
+	public static void setWantPersistent(boolean persistence) {
+		wantPersistent= persistence;
 	}
 }
