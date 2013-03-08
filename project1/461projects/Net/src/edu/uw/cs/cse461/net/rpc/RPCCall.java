@@ -136,6 +136,7 @@ public class RPCCall extends NetLoadableService {
 		JSONObject connectResponse = handler.readMessageAsJSONObject();
 		if(!connectResponse.get("type").equals("OK")) {
 		  //handle error
+		  throw new IOException("Error Response");
 		}
 		
 		//Invoke
@@ -150,8 +151,9 @@ public class RPCCall extends NetLoadableService {
 		handler.sendMessage(invoke.marshall());
 		
 		JSONObject invokeResponse = handler.readMessageAsJSONObject();
-		if(!connectResponse.get("type").equals("OK")) {
+		if(!invokeResponse.get("type").equals("OK")) {
 		  //handle error
+		  throw new IOException("Error Response");
 		}
 		
 		//close connection

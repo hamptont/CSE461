@@ -91,7 +91,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 						JSONObject connectJSON = handler.readMessageAsJSONObject();
 						if (!connectJSON.get("action").equals("connect")) {
 							//failed connect
-							
+							throw new Exception("Connect message not received");
 						}
 						
 						
@@ -108,6 +108,7 @@ public class RPCService extends NetLoadableService implements Runnable, RPCServi
 						String type = invokeJSON.getString("type");
 						if (!type.equals("invoke")) {
 							//failed connect
+							throw new Exception("Invoke message not received");
 						}
 						
 						RPCCallableMethod method = getRegistrationFor(invokeJSON.getString("app"), invokeJSON.getString("method"));
